@@ -2,9 +2,9 @@ import time
 
 import numpy as np
 import pandas as pd
-from scipy.sparse import coo_matrix
+from scipy.sparse import csr_matrix
 
-from utils import coo2arr
+from utils import csr2arr
 from utils_print import print_result_2d, print_result_3d
 
 
@@ -27,7 +27,7 @@ class Provenance:
         Create a sparse tensor from indices.
         """
         data = np.ones(indices_out.shape[0], dtype=np.int8)
-        sparse_tensor = coo_matrix((data, (indices_out, indices_in)), shape=shape)
+        sparse_tensor = csr_matrix((data, (indices_out, indices_in)), shape=shape)
         return sparse_tensor
 
     # def save_result(self, operation: str, result):
@@ -105,7 +105,7 @@ class Provenance:
 def print_prov_result(
         df_in: pd.DataFrame | tuple[pd.DataFrame, pd.DataFrame],
         df_out: pd.DataFrame,
-        result: tuple[coo_matrix, coo_matrix] | tuple[tuple[coo_matrix, coo_matrix], coo_matrix],
+        result: tuple[csr_matrix, csr_matrix] | tuple[tuple[csr_matrix, csr_matrix], csr_matrix],
         num_examples: int = 5
 ):
     """
@@ -115,8 +115,8 @@ def print_prov_result(
     karg = {
         "tensor_record": result[0],
         "tensor_attr": result[1],
-        "arr_record": coo2arr(tensor_record),
-        "arr_attr": coo2arr(tensor_attr)
+        "arr_record": csr2arr(tensor_record),
+        "arr_attr": csr2arr(tensor_attr)
     }
 
     if isinstance(df_in, pd.DataFrame):
