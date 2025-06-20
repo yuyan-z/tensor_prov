@@ -44,8 +44,3 @@ def csr2arr(csr: csr_matrix | tuple[csr_matrix, csr_matrix]):
         arr = df.fillna(-1).to_numpy(dtype=int)
 
     return arr
-
-
-
-
-

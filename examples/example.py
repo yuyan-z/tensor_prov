@@ -1,8 +1,8 @@
 import numpy as np
 import pandas as pd
 
-# from provenance_coo import Provenance, print_prov_result
-from provenance_csr import Provenance, print_prov_result
+from provenance_coo import Provenance, print_prov_result
+# from provenance_csr import Provenance, print_prov_result
 
 # Example datasets
 df1 = pd.DataFrame({
