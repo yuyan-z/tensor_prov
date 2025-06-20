@@ -1,22 +1,19 @@
-import numpy as np
 import pandas as pd
-from scipy.sparse import coo_matrix
-
-from utils import coo2arr
 
 
 def print_result_2d(
         df_in: pd.DataFrame,
         df_out: pd.DataFrame,
+        num_examples: int,
         tensor_record: any,
         tensor_attr: any,
-        num_examples: int
+        arr_record: list,
+        arr_attr: list
 ):
     print("-- D_in --\n")
     print(df_in)
     print("\n-- D_out --\n")
     print(df_out)
-    arr_record = coo2arr(tensor_record)
     print("\n-- Record tensor --\n")
     print(tensor_record)
     print("\n-- Record examples --\n")
@@ -35,7 +32,7 @@ def print_result_2d(
         print("\n-- Attr examples --\n")
         cols_in = df_in.columns.tolist()
         cols_out = df_out.columns.tolist()
-        arr_attr = coo2arr(tensor_attr)
+
         attr_examples = list(arr_attr)
         for idx_out, idx_in in attr_examples:
             print(f"D_out[{cols_out[idx_out]}] is from D_in[{cols_in[idx_in]}]: ")
@@ -44,9 +41,11 @@ def print_result_2d(
 def print_result_3d(
         dfs_in: tuple[pd.DataFrame, pd.DataFrame],
         df_out: pd.DataFrame,
+        num_examples: int,
         tensor_record: any,
         tensor_attr: any,
-        num_examples: int
+        arr_record: list,
+        arr_attr: list
 ):
     df_left, df_right = dfs_in
 
@@ -62,15 +61,19 @@ def print_result_3d(
     print()
     print(tensor_record[1])
     print("\n-- Record examples --\n")
-    arr_record = coo2arr(tensor_record)
     record_examples = list(arr_record[:num_examples])
     for idx_out, idx_left, idx_right in record_examples:
-        print(f"D_out[{idx_out}] is from D_left[{idx_left}] and D_right[{idx_right}]: ")
-        print(f"\t{df_out.iloc[idx_out].tolist()}")
-        print("\tis from")
-        print(f"\t{df_left.iloc[idx_left].tolist()}")
-        print("\tand")
-        print(f"\t{df_right.iloc[idx_right].tolist()}\n")
+        s = f"D_out[{idx_out}] is from "
+        s_detail = f"\t{df_out.iloc[idx_out].tolist()} is from "
+        if idx_left != -1:
+            s += f"D_left[{idx_left}] "
+            s_detail += f"\n\t{df_left.iloc[idx_left].tolist()}"
+        if idx_right != -1:
+            s += f"D_right[{idx_right}] "
+            s_detail += f"\n\t{df_right.iloc[idx_right].tolist()}"
+        print(s)
+        print(s_detail)
+
     if len(arr_record) > num_examples:
         print(f"... {len(arr_record)} items in total.")
 
@@ -82,7 +85,6 @@ def print_result_3d(
     cols_left = df_left.columns.tolist()
     cols_right = df_right.columns.tolist()
     cols_out = df_out.columns.tolist()
-    arr_attr = coo2arr(tensor_attr)
     attr_examples = list(arr_attr)
     for idx_out, idx_left, idx_right in attr_examples:
         s = f"D_out[{cols_out[idx_out]}] is from "

@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 from scipy.sparse import coo_matrix
 
+from utils import coo2arr
 from utils_print import print_result_2d, print_result_3d
 
 
@@ -111,7 +112,14 @@ class Provenance:
         Explain the provenance result
         """
         tensor_record, tensor_attr = result
+        karg = {
+            "tensor_record": result[0],
+            "tensor_attr": result[1],
+            "arr_record": coo2arr(tensor_record),
+            "arr_attr": coo2arr(tensor_attr)
+        }
+
         if isinstance(df_in, pd.DataFrame):
-            print_result_2d(df_in, df_out, tensor_record, tensor_attr, num_examples)
+            print_result_2d(df_in, df_out, num_examples, **karg)
         elif isinstance(df_in, tuple):
-            print_result_3d(df_in, df_out, tensor_record, tensor_attr, num_examples)
+            print_result_3d(df_in, df_out, num_examples, **karg)

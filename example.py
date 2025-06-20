@@ -72,17 +72,17 @@ def example_data_transformation():
 
 def example_data_fusion():
     # Inner join
-    df_inner_joined = pd.merge(df1, df2, on="ID", how="inner")
+    df_inner_joined = pd.merge(df1, df2, on="ID", how="outer")
     result, runtime = prov.capture((df1, df2), df_inner_joined, key_column="ID")
     prov.print_result((df1, df2), df_inner_joined, result)
 
 
 if __name__ == '__main__':
-    example_horizontal_reduction()
+    # example_horizontal_reduction()
     # example_horizontal_augmentation()
     # example_vertical_reduction()
     # example_vertical_augmentation()
     # example_data_transformation()
-    # example_data_fusion()
+    example_data_fusion()
 
 
