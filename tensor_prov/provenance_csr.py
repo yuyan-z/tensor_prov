@@ -4,8 +4,8 @@ import numpy as np
 import pandas as pd
 from scipy.sparse import csr_matrix
 
-from utils import csr2arr
-from utils_print import print_result_2d, print_result_3d
+from tensor_prov.utils import csr2arr
+from tensor_prov.utils_print import print_result_2d, print_result_3d
 
 
 class Provenance:
@@ -113,13 +113,59 @@ def print_prov_result(
     """
     tensor_record, tensor_attr = result
     karg = {
-        "tensor_record": result[0],
-        "tensor_attr": result[1],
+        "tensor_record": tensor_record,
+        "tensor_attr": tensor_attr,
         "arr_record": csr2arr(tensor_record),
         "arr_attr": csr2arr(tensor_attr)
     }
-
     if isinstance(df_in, pd.DataFrame):
         print_result_2d(df_in, df_out, num_examples, **karg)
     elif isinstance(df_in, tuple):
         print_result_3d(df_in, df_out, num_examples, **karg)
+
+
+def trace(
+        tensors: list[csr_matrix],
+        direction: str = "backward",
+        indices: list[int] | None = None,
+        keep_path: bool = False
+):
+    if direction == "forward":
+        tensors_ordered = [t.T for t in tensors]
+    elif direction == "backward":
+        tensors_ordered = tensors[::-1]
+    else:
+        raise ValueError("direction must be 'forward' or 'backward'")
+
+    # Slicing
+    t1 = tensors_ordered[0] if indices is None else slice_csr(tensors_ordered[0], indices)
+
+    if not keep_path:
+        # csr matrix multiplication
+        for t2 in tensors_ordered[1:]:
+            t1 = t1 @ t2
+        result = csr2arr(t1)
+    else:
+        # pandas join
+        t1_arr = csr2arr(t1)
+        df_path = pd.DataFrame(t1_arr).add_prefix('path_')
+        for t2 in tensors_ordered[1:]:
+            t2_arr = csr2arr(t2)
+            df_t2 = pd.DataFrame(t2_arr).add_prefix('t_')
+            df_path = df_path.merge(df_t2, left_on=df_path.columns[-1], right_on='t_0', how='left')
+            df_path = df_path.drop(columns=['t_0'])
+        df_path = df_path.sort_values(by=df_path.columns[0])
+        result = df_path.fillna(-1).to_numpy(dtype=int)
+
+    return result
+
+
+def slice_csr(csr: csr_matrix, indices: list | np.ndarray) -> csr_matrix:
+    indices = np.array(indices)
+    coo = csr.tocoo()
+    mask = np.isin(coo.row, indices)
+    new_row = coo.row[mask]
+    new_col = coo.col[mask]
+    new_data = coo.data[mask]
+    return csr_matrix((new_data, (new_row, new_col)), shape=csr.shape)
+

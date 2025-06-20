@@ -1,9 +1,8 @@
 import numpy as np
 import pandas as pd
 
-from tensor_prov.provenance_coo import Provenance, print_prov_result, trace
-
-# from provenance_csr import Provenance, print_prov_result
+# from tensor_prov.provenance_coo import Provenance, print_prov_result, trace
+from tensor_prov.provenance_csr import Provenance, print_prov_result, trace
 
 # Example datasets
 df = pd.DataFrame({
@@ -123,9 +122,9 @@ def example_trace():
     trace_record = trace(tensors_record, direction="backward", indices=None, keep_path=False)
     print(trace_record)
 
-    # print("\n-- Trace records sliced --\n")
-    # trace_record_sliced = trace(tensors_record, direction="backward", indices=[1, 2], keep_path=False)
-    # print(trace_record_sliced)
+    print("\n-- Trace records sliced --\n")
+    trace_record_sliced = trace(tensors_record, direction="backward", indices=[1, 2], keep_path=False)
+    print(trace_record_sliced)
 
     # print("\n-- Trace records with path --\n")
     # trace_record_path = trace(tensors_record, direction="backward", indices=None, keep_path=True)
@@ -137,10 +136,10 @@ def example_trace():
 
 
 if __name__ == '__main__':
-    example_horizontal_reduction()
+    # example_horizontal_reduction()
     # example_horizontal_augmentation()
     # example_vertical_reduction()
     # example_vertical_augmentation()
     # example_data_transformation()
     # example_data_fusion()
-    # example_trace()
+    example_trace()

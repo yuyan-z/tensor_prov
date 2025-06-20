@@ -161,10 +161,10 @@ def trace(
     return result
 
 
-def slice_coo(coo_mat: coo_matrix, indices: list | np.ndarray) -> coo_matrix:
-    mask = np.isin(coo_mat.row, indices)
-    new_row = coo_mat.row[mask]
-    new_col = coo_mat.col[mask]
-    new_data = coo_mat.data[mask]
-    return coo_matrix((new_data, (new_row, new_col)), shape=coo_mat.shape)
+def slice_coo(coo: coo_matrix, indices: list | np.ndarray) -> coo_matrix:
+    mask = np.isin(coo.row, indices)
+    new_row = coo.row[mask]
+    new_col = coo.col[mask]
+    new_data = coo.data[mask]
+    return coo_matrix((new_data, (new_row, new_col)), shape=coo.shape)
 
