@@ -1,7 +1,8 @@
 import numpy as np
 import pandas as pd
 
-from provenance_coo import Provenance, print_prov_result
+from tensor_prov.provenance_coo import Provenance, print_prov_result, trace
+
 # from provenance_csr import Provenance, print_prov_result
 
 # Example datasets
@@ -79,12 +80,10 @@ def example_data_fusion():
 
 
 def example_trace():
-    # 1. Drop rows with NaN in Birthdate and reorder rows
+    # 1. Drop rows with NaN in Birthdate
     df1 = df.copy()
     df1["Birthdate"] = pd.to_datetime(df1["Birthdate"], errors='coerce')
-    df1 = df1.dropna(subset=["Birthdate"])
-    df1 = df1.sort_values(by="Birthdate")
-    df1 = df1.reset_index(drop=True)
+    df1 = df1.dropna(subset=["Birthdate"]).reset_index(drop=True)
     result1, runtime = prov.capture(df, df1, "ID")
 
     # 2. Split BirthDate to Year, Month, Day. Drop BirthDate. Reorder columns
@@ -99,9 +98,8 @@ def example_trace():
     }
     result2, runtime = prov.capture(df1, df2, "ID", column_mapping)
 
-    # 3. Value transformation
-    df3 = df2.copy()
-    df3["Gender"] = df3["Gender"].map({"F": 0, "M": 1})
+    # 3. Reorder rows by Year
+    df3 = df2.sort_values(by="Year").reset_index(drop=True)
     result3, runtime = prov.capture(df2, df3, "ID")
 
     dfs = [df, df1, df2, df3]
@@ -109,36 +107,40 @@ def example_trace():
     tensors_record = [result[0] for result in results]
     tensors_attr = [result[1] for result in results]
 
-    print("\n-- Records --\n")
+    for d in dfs:
+        print(d)
+        print()
+
+    for t in tensors_record:
+        print(t)
+        print()
+
+    # for t in tensors_attr:
+    #     print(t)
+    #     print()
+
+    print("\n-- Trace records --\n")
     trace_record = trace(tensors_record, direction="backward", indices=None, keep_path=False)
     print(trace_record)
 
-    print("\n-- Records sliced --\n")
-    trace_record_sliced = trace(tensors_record, direction="backward", indices=[1, 2], keep_path=False)
-    print(trace_record_sliced)
+    # print("\n-- Trace records sliced --\n")
+    # trace_record_sliced = trace(tensors_record, direction="backward", indices=[1, 2], keep_path=False)
+    # print(trace_record_sliced)
 
-    print("\n-- Records with path --\n")
-    trace_record_path = trace(tensors_record, direction="backward", indices=None, keep_path=True)
-    print(trace_record_path)
+    # print("\n-- Trace records with path --\n")
+    # trace_record_path = trace(tensors_record, direction="backward", indices=None, keep_path=True)
+    # print(trace_record_path)
 
-    print("\n-- Records sliced with path --\n")
-    trace_record_sliced_path = trace(tensors_record, direction="backward", indices=[1, 2], keep_path=True)
-    print(trace_record_sliced_path)
-
-
-
-
-
-
+    # print("\n-- Trace records sliced with path --\n")
+    # trace_record_sliced_path = trace(tensors_record, direction="backward", indices=[1, 2], keep_path=True)
+    # print(trace_record_sliced_path)
 
 
 if __name__ == '__main__':
-    # example_horizontal_reduction()
+    example_horizontal_reduction()
     # example_horizontal_augmentation()
     # example_vertical_reduction()
     # example_vertical_augmentation()
     # example_data_transformation()
     # example_data_fusion()
-    example_trace()
-
-
+    # example_trace()
