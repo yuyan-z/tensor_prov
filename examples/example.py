@@ -5,14 +5,14 @@ from provenance_coo import Provenance, print_prov_result
 # from provenance_csr import Provenance, print_prov_result
 
 # Example datasets
-df1 = pd.DataFrame({
+df = pd.DataFrame({
     "ID": [10, 20, 30, 40],
     "Birthdate": ["1996-07-12", "1994-03-08", np.nan, "1987-11-23"],
     "Gender": ["F", "M", "F", "M"],
     "Postcode": ["90210", np.nan, "12345", "67890"]
 })
 
-df2 = pd.DataFrame({
+name_df = pd.DataFrame({
     "ID": [20, 40],
     "Name": ["Alex", "Bob"]
 })
@@ -22,9 +22,9 @@ prov = Provenance()
 
 def example_horizontal_reduction():
     # Drop rows where containing NaN values
-    df1_horizontal_reduced = df1.dropna().reset_index(drop=True)
-    result, runtime = prov.capture(df1, df1_horizontal_reduced, key_column="ID")
-    print_prov_result(df1, df1_horizontal_reduced, result)
+    df_horizontal_reduced = df.dropna().reset_index(drop=True)
+    result, runtime = prov.capture(df, df_horizontal_reduced, key_column="ID")
+    print_prov_result(df, df_horizontal_reduced, result)
 
 
 def example_horizontal_augmentation():
@@ -36,54 +36,109 @@ def example_horizontal_augmentation():
         "Postcode": ["90210", np.nan, "12345", "67890", "75014", "29280"]
     })
     df_horizontal_augmented = df_horizontal_augmented.sort_values(by="ID").reset_index(drop=True)
-    result, runtime = prov.capture(df1, df_horizontal_augmented, key_column="ID")
-    print_prov_result(df1, df_horizontal_augmented, result)
+    result, runtime = prov.capture(df, df_horizontal_augmented, key_column="ID")
+    print_prov_result(df, df_horizontal_augmented, result)
 
 
 def example_vertical_reduction():
     # Select columns and reorder
-    df1_vertical_reduced = df1[["ID", "Gender", "Birthdate"]]
-    result, runtime = prov.capture(df1, df1_vertical_reduced, "ID")
-    print_prov_result(df1, df1_vertical_reduced, result)
+    df_vertical_reduced = df[["ID", "Gender", "Birthdate"]]
+    result, runtime = prov.capture(df, df_vertical_reduced, "ID")
+    print_prov_result(df, df_vertical_reduced, result)
 
 
 def example_vertical_augmentation():
-    # Split BirthDate to Year, Month, Day. Drop BirthDate. Reorder
-    df1_vertical_augmented = df1.copy()
-    birth_split = df1_vertical_augmented["Birthdate"].str.split("-", expand=True)
-    df1_vertical_augmented["Year"] = birth_split[0]
-    df1_vertical_augmented["Month"] = birth_split[1]
-    df1_vertical_augmented["Day"] = birth_split[2]
-    df1_vertical_augmented = df1_vertical_augmented[["ID", "Birthdate", "Gender", "Postcode", "Year", "Month", "Day"]]
+    # Split BirthDate to Year, Month, Day. Drop BirthDate. Reorder columns
+    df_vertical_augmented = df.copy()
+    birth_split = df_vertical_augmented["Birthdate"].str.split("-", expand=True)
+    df_vertical_augmented["Year"] = birth_split[0]
+    df_vertical_augmented["Month"] = birth_split[1]
+    df_vertical_augmented["Day"] = birth_split[2]
+    df_vertical_augmented = df_vertical_augmented[["ID", "Gender", "Postcode", "Year", "Month", "Day"]]
     column_mapping = {
         "Birthdate": ["Year", "Month", "Day"]
     }
 
-    result, runtime = prov.capture(df1, df1_vertical_augmented, "ID", column_mapping)
-    print_prov_result(df1, df1_vertical_augmented, result)
+    result, runtime = prov.capture(df, df_vertical_augmented, "ID", column_mapping)
+    print_prov_result(df, df_vertical_augmented, result)
 
 
 def example_data_transformation():
     # Value transformation
-    df1_transformed = df1.copy()
-    df1_transformed["Gender"] = df1_transformed["Gender"].map({"F": 0, "M": 1})
-    result, runtime = prov.capture(df1, df1_transformed, "ID")
-    print_prov_result(df1, df1_transformed, result)
+    df_transformed = df.copy()
+    df_transformed["Gender"] = df_transformed["Gender"].map({"F": 0, "M": 1})
+    result, runtime = prov.capture(df, df_transformed, "ID")
+    print_prov_result(df, df_transformed, result)
 
 
 def example_data_fusion():
     # Inner join
-    df_inner_joined = pd.merge(df1, df2, on="ID", how="outer")
-    result, runtime = prov.capture((df1, df2), df_inner_joined, key_column="ID")
-    print_prov_result((df1, df2), df_inner_joined, result)
+    df_inner_joined = pd.merge(df, name_df, on="ID", how="outer")
+    result, runtime = prov.capture((df, name_df), df_inner_joined, key_column="ID")
+    print_prov_result((df, name_df), df_inner_joined, result)
+
+
+def example_trace():
+    # 1. Drop rows with NaN in Birthdate and reorder rows
+    df1 = df.copy()
+    df1["Birthdate"] = pd.to_datetime(df1["Birthdate"], errors='coerce')
+    df1 = df1.dropna(subset=["Birthdate"])
+    df1 = df1.sort_values(by="Birthdate")
+    df1 = df1.reset_index(drop=True)
+    result1, runtime = prov.capture(df, df1, "ID")
+
+    # 2. Split BirthDate to Year, Month, Day. Drop BirthDate. Reorder columns
+    df2 = df1.copy()
+    df2["Year"] = df2["Birthdate"].dt.year
+    df2["Month"] = df2["Birthdate"].dt.month
+    df2["Day"] = df2["Birthdate"].dt.day
+    df2 = df2.drop(columns=["Birthdate"])
+    df2 = df2[["ID", "Gender", "Postcode", "Year", "Month", "Day"]]
+    column_mapping = {
+        "Birthdate": ["Year", "Month", "Day"]
+    }
+    result2, runtime = prov.capture(df1, df2, "ID", column_mapping)
+
+    # 3. Value transformation
+    df3 = df2.copy()
+    df3["Gender"] = df3["Gender"].map({"F": 0, "M": 1})
+    result3, runtime = prov.capture(df2, df3, "ID")
+
+    dfs = [df, df1, df2, df3]
+    results = [result1, result2, result3]
+    tensors_record = [result[0] for result in results]
+    tensors_attr = [result[1] for result in results]
+
+    print("\n-- Records --\n")
+    trace_record = trace(tensors_record, direction="backward", indices=None, keep_path=False)
+    print(trace_record)
+
+    print("\n-- Records sliced --\n")
+    trace_record_sliced = trace(tensors_record, direction="backward", indices=[1, 2], keep_path=False)
+    print(trace_record_sliced)
+
+    print("\n-- Records with path --\n")
+    trace_record_path = trace(tensors_record, direction="backward", indices=None, keep_path=True)
+    print(trace_record_path)
+
+    print("\n-- Records sliced with path --\n")
+    trace_record_sliced_path = trace(tensors_record, direction="backward", indices=[1, 2], keep_path=True)
+    print(trace_record_sliced_path)
+
+
+
+
+
+
 
 
 if __name__ == '__main__':
-    example_horizontal_reduction()
+    # example_horizontal_reduction()
     # example_horizontal_augmentation()
     # example_vertical_reduction()
     # example_vertical_augmentation()
     # example_data_transformation()
     # example_data_fusion()
+    example_trace()
 
 
