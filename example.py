@@ -78,11 +78,11 @@ def example_data_fusion():
 
 
 if __name__ == '__main__':
-    # example_horizontal_reduction()
+    example_horizontal_reduction()
     # example_horizontal_augmentation()
     # example_vertical_reduction()
     # example_vertical_augmentation()
     # example_data_transformation()
-    example_data_fusion()
+    # example_data_fusion()
 
 

@@ -4,6 +4,8 @@ import numpy as np
 import pandas as pd
 from scipy.sparse import coo_matrix
 
+from utils_print import print_result_2d, print_result_3d
+
 
 class Provenance:
     def __init__(self):
@@ -102,107 +104,14 @@ class Provenance:
             self,
             df_in: pd.DataFrame | tuple[pd.DataFrame, pd.DataFrame],
             df_out: pd.DataFrame,
-            results: tuple[coo_matrix, coo_matrix] | tuple[tuple[coo_matrix, coo_matrix], coo_matrix],
+            result: tuple[coo_matrix, coo_matrix] | tuple[tuple[coo_matrix, coo_matrix], coo_matrix],
             num_examples: int = 5
     ):
         """
-        Explain the provenance results
+        Explain the provenance result
         """
-        tensor_record, tensor_attr = results
+        tensor_record, tensor_attr = result
         if isinstance(df_in, pd.DataFrame):
-            self.print_result_2d(df_in, df_out, tensor_record, tensor_attr, num_examples)
+            print_result_2d(df_in, df_out, tensor_record, tensor_attr, num_examples)
         elif isinstance(df_in, tuple):
-            self.print_result_3d(df_in, df_out, tensor_record, tensor_attr, num_examples)
-
-    def print_result_2d(
-            self,
-            df_in: pd.DataFrame,
-            df_out: pd.DataFrame,
-            tensor_record: coo_matrix | np.ndarray,
-            tensor_attr: coo_matrix | np.ndarray | None = None,
-            num_examples: int = 5
-    ):
-        print("-- D_in --\n")
-        print(df_in)
-        print("\n-- D_out --\n")
-        print(df_out)
-
-        print("\n-- Record tensor --\n")
-        print(tensor_record)
-        print("\n-- Record examples --\n")
-        if not isinstance(tensor_record, np.ndarray):
-            tensor_record_arr = np.vstack((
-                tensor_record.row,
-                tensor_record.col
-            )).T
-        else:
-            tensor_record_arr = tensor_record
-        record_examples = list(tensor_record_arr[:num_examples])
-        for idx_out, idx_in in record_examples:
-            print(f"D_out[{idx_out}] is from D_in[{idx_in}]: ")
-            print(f"\t{df_out.iloc[idx_out].tolist()}")
-            print("\tis from")
-            print(f"\t{df_in.iloc[idx_in].tolist()}\n")
-        if len(tensor_record_arr) > num_examples:
-            print(f"... {len(tensor_record_arr)} items in total.")
-
-        if tensor_attr is not None:
-            print("\n-- Attr tensor --\n")
-            print(tensor_attr)
-            print("\n-- Attr examples --\n")
-            cols_in = df_in.columns.tolist()
-            cols_out = df_out.columns.tolist()
-            if not isinstance(tensor_attr, np.ndarray):
-                tensor_attr_arr = np.vstack((
-                    tensor_attr.row,
-                    tensor_attr.col
-                )).T
-            else:
-                tensor_attr_arr = tensor_attr
-            attr_examples = list(tensor_attr_arr)
-            for idx_out, idx_in in attr_examples:
-                print(f"D_out[{cols_out[idx_out]}] is from D_in[{cols_in[idx_in]}]: ")
-
-    def print_result_3d(
-            self,
-            dfs_in: tuple[pd.DataFrame, pd.DataFrame],
-            df_out: pd.DataFrame,
-            tensor_record: tuple[coo_matrix, coo_matrix],
-            tensor_attr: tuple[coo_matrix, coo_matrix],
-            num_examples: int = 5
-    ):
-        df_left, df_right = dfs_in
-
-        print("-- D_left --\n")
-        print(df_left)
-        print("\n-- D_right --\n")
-        print(df_right)
-        print("\n-- D_out --\n")
-        print(df_out)
-
-        tensor_record1, tensor_record2 = tensor_record
-        tensor_record_arr = np.vstack((
-            tensor_record1.row,
-            tensor_record1.col,
-            tensor_record2.col
-        )).T
-
-        print("\n-- Record tensor --\n")
-        print(tensor_record1)
-        print(tensor_record2)
-        print("\n-- Record examples --\n")
-        record_examples = list(tensor_record_arr[:num_examples])
-        for idx_out, idx_left, idx_right in record_examples:
-            print(f"D_out[{idx_out}] is from D_left[{idx_left}] and D_right[{idx_right}]: ")
-            print(f"\t{df_out.iloc[idx_out].tolist()}")
-            print("\tis from")
-            print(f"\t{df_left.iloc[idx_left].tolist()}")
-            print("\tand")
-            print(f"\t{df_right.iloc[idx_right].tolist()}\n")
-        if len(tensor_record_arr) > num_examples:
-            print(f"... {len(tensor_record_arr)} items in total.")
-
-        tensor_attr1, tensor_attr2 = tensor_attr
-        print("\n-- Attr tensor --\n")
-        print(tensor_attr1)
-        print(tensor_attr2)
+            print_result_3d(df_in, df_out, tensor_record, tensor_attr, num_examples)
