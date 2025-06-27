@@ -2,7 +2,8 @@ import numpy as np
 import pandas as pd
 
 # from tensor_prov.provenance_coo import Provenance, print_prov_result, trace
-from tensor_prov.provenance_csr import Provenance, print_prov_result, trace
+# from tensor_prov.provenance_csr import Provenance, print_prov_result, trace
+from tensor_prov.provenance_pandas import Provenance, print_prov_result, trace
 
 # Example datasets
 df = pd.DataFrame({
@@ -78,7 +79,7 @@ def example_data_fusion():
     print_prov_result((df, name_df), df_inner_joined, result)
 
 
-def example_trace():
+def example_trace(direction: str = "backward"):
     # 1. Drop rows with NaN in Birthdate
     df1 = df.copy()
     df1["Birthdate"] = pd.to_datetime(df1["Birthdate"], errors='coerce')
@@ -112,6 +113,9 @@ def example_trace():
 
     for t in tensors_record:
         print(t)
+        # print(t.indptr)
+        # print(t.indices[t.indptr[2]:t.indptr[2+1]])
+        # # we want to get the corresponding col of row 0
         print()
 
     # for t in tensors_attr:
@@ -119,20 +123,20 @@ def example_trace():
     #     print()
 
     print("\n-- Trace records --\n")
-    trace_record = trace(tensors_record, direction="backward", indices=None, keep_path=False)
+    trace_record = trace(tensors_record, direction=direction, indices=None, keep_path=False)
     print(trace_record)
 
     print("\n-- Trace records sliced --\n")
-    trace_record_sliced = trace(tensors_record, direction="backward", indices=[1, 2], keep_path=False)
+    trace_record_sliced = trace(tensors_record, direction=direction, indices=[1, 2], keep_path=False)
     print(trace_record_sliced)
 
-    # print("\n-- Trace records with path --\n")
-    # trace_record_path = trace(tensors_record, direction="backward", indices=None, keep_path=True)
-    # print(trace_record_path)
+    print("\n-- Trace records with path --\n")
+    trace_record_path = trace(tensors_record, direction=direction, indices=None, keep_path=True)
+    print(trace_record_path)
 
-    # print("\n-- Trace records sliced with path --\n")
-    # trace_record_sliced_path = trace(tensors_record, direction="backward", indices=[1, 2], keep_path=True)
-    # print(trace_record_sliced_path)
+    print("\n-- Trace records sliced with path --\n")
+    trace_record_sliced_path = trace(tensors_record, direction=direction, indices=[1, 2], keep_path=True)
+    print(trace_record_sliced_path)
 
 
 if __name__ == '__main__':
@@ -142,4 +146,5 @@ if __name__ == '__main__':
     # example_vertical_augmentation()
     # example_data_transformation()
     # example_data_fusion()
-    example_trace()
+    # example_trace("backward")
+    example_trace("forward")

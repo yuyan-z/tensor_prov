@@ -57,9 +57,12 @@ def print_result_3d(
     print(df_out)
 
     print("\n-- Record tensor --\n")
-    print(tensor_record[0])
-    print()
-    print(tensor_record[1])
+    if isinstance(tensor_record, tuple):
+        print(tensor_record[0])
+        print()
+        print(tensor_record[1])
+    else:
+        print(tensor_record)
     print("\n-- Record examples --\n")
     record_examples = list(arr_record[:num_examples])
     for idx_out, idx_left, idx_right in record_examples:
@@ -78,9 +81,12 @@ def print_result_3d(
         print(f"... {len(arr_record)} items in total.")
 
     print("\n-- Attr tensor --\n")
-    print(tensor_attr[0])
-    print()
-    print(tensor_attr[1])
+    if isinstance(tensor_attr, tuple):
+        print(tensor_attr[0])
+        print()
+        print(tensor_attr[1])
+    else:
+        print(tensor_attr)
     print("\n-- Attr examples --\n")
     cols_left = df_left.columns.tolist()
     cols_right = df_right.columns.tolist()
