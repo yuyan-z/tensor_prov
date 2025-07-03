@@ -156,7 +156,8 @@ def trace(
             df_path = df_path.merge(df_t2, left_on=df_path.columns[-1], right_on='t_0', how='left')
             df_path = df_path.drop(columns=['t_0'])
         df_path = df_path.sort_values(by=df_path.columns[0])
-        result = df_path.fillna(-1).to_numpy(dtype=int)
+        # result = df_path.fillna(-1).to_numpy(dtype=int)
+        result = df_path.to_numpy(dtype=int)
 
     return result
 
