@@ -29,7 +29,7 @@ def example_horizontal_reduction():
 
 
 def example_horizontal_augmentation():
-    # Generate instances and resort
+    # Generate instances and reorder
     df_horizontal_augmented = pd.DataFrame({
         "ID": [10, 20, 30, 40, 15, 35],
         "Birthdate": ["1996-07-12", "1994-03-08", np.nan, "1987-11-23", "2000-10-20", "1999-01-06"],
@@ -49,17 +49,15 @@ def example_vertical_reduction():
 
 
 def example_vertical_augmentation():
-    # Split BirthDate to Year, Month, Day. Drop BirthDate. Reorder columns
+    # Split BirthDate to Year, Month, Day.
     df_vertical_augmented = df.copy()
     birth_split = df_vertical_augmented["Birthdate"].str.split("-", expand=True)
     df_vertical_augmented["Year"] = birth_split[0]
     df_vertical_augmented["Month"] = birth_split[1]
     df_vertical_augmented["Day"] = birth_split[2]
-    df_vertical_augmented = df_vertical_augmented[["ID", "Gender", "Postcode", "Year", "Month", "Day"]]
     column_mapping = {
         "Birthdate": ["Year", "Month", "Day"]
     }
-
     result, runtime = prov.capture(df, df_vertical_augmented, "ID", column_mapping)
     print_prov_result(df, df_vertical_augmented, result)
 
@@ -146,5 +144,5 @@ if __name__ == '__main__':
     # example_vertical_augmentation()
     # example_data_transformation()
     # example_data_fusion()
-    # example_trace("backward")
-    example_trace("forward")
+    example_trace("backward")
+    # example_trace("forward")
