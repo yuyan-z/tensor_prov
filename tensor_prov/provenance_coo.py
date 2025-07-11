@@ -49,13 +49,15 @@ class Provenance:
             self,
             df_in: pd.DataFrame | tuple[pd.DataFrame, pd.DataFrame],
             df_out: pd.DataFrame,
-            key_column: str,
+            key_column: str | None = None,
             column_mapping: dict | None = None
     ):
         if isinstance(df_in, pd.DataFrame):
             tensor_record = self.capture_row_operation(df_in, df_out, key_column)
             tensor_attr = self.capture_column_operation(df_in, df_out, column_mapping)
         elif isinstance(df_in, tuple):
+            if key_column is None:
+                raise ValueError("key_column cannot be None for Data Fusion")
             df_in1, df_in2 = df_in
             tensor_record1 = self.capture_row_operation(df_in1, df_out, key_column)
             tensor_record2 = self.capture_row_operation(df_in2, df_out, key_column)
@@ -68,10 +70,10 @@ class Provenance:
 
         return tensor_record, tensor_attr
 
-    def capture_row_operation(self, df_in: pd.DataFrame, df_out: pd.DataFrame, key_column: str):
+    def capture_row_operation(self, df_in: pd.DataFrame, df_out: pd.DataFrame, key_column: str | None):
         n_out, n_in = len(df_out), len(df_in)  # provenance shape (n_out, n_in)
-        ids_out = df_out[key_column].to_numpy()
-        ids_in = df_in[key_column].to_numpy()
+        ids_out = df_out.index.to_numpy() if key_column is None else df_out[key_column].to_numpy()
+        ids_in = df_in.index.to_numpy() if key_column is None else df_in[key_column].to_numpy()
         indices_out, indices_in = np.where(ids_out[:, None] == ids_in[None, :])
 
         # Create sparse tensor
@@ -105,18 +107,21 @@ class Provenance:
 def print_prov_result(
         df_in: pd.DataFrame | tuple[pd.DataFrame, pd.DataFrame],
         df_out: pd.DataFrame,
-        result: tuple[coo_matrix, coo_matrix] | tuple[tuple[coo_matrix, coo_matrix], coo_matrix],
+        result: tuple,
+        direction: str | None = None,
         num_examples: int = 5
 ):
     """
     Print the provenance result
     """
     tensor_record, tensor_attr = result
+    arr_record = tensor_record if isinstance(tensor_record, np.ndarray) else coo2arr(tensor_record)
+    arr_attr = tensor_attr if isinstance(tensor_attr, np.ndarray) else coo2arr(tensor_attr)
     karg = {
         "tensor_record": tensor_record,
         "tensor_attr": tensor_attr,
-        "arr_record": coo2arr(tensor_record),
-        "arr_attr": coo2arr(tensor_attr)
+        "arr_record": arr_record[:, [1, 0]] if direction == "forward" else arr_record,
+        "arr_attr": arr_attr[:, [1, 0]] if direction == "forward" else arr_attr,
     }
     if isinstance(df_in, pd.DataFrame):
         print_result_2d(df_in, df_out, num_examples, **karg)
@@ -130,36 +135,87 @@ def trace(
         indices: list[int] | None = None,
         keep_path: bool = False
 ):
-    if direction == "forward":
-        tensors_ordered = [t.T for t in tensors]
-    elif direction == "backward":
-        tensors_ordered = tensors[::-1]
-    else:
-        raise ValueError("direction must be 'forward' or 'backward'")
-
-    # Slicing
-    t1 = tensors_ordered[0] if indices is None else slice_coo(tensors_ordered[0], indices)
-
     if not keep_path:
         # csr matrix multiplication
+        if direction == "forward":
+            tensors_ordered = [t.T for t in tensors]
+        elif direction == "backward":
+            tensors_ordered = tensors[::-1]
+        else:
+            raise ValueError("direction must be 'forward' or 'backward'")
+        t1 = tensors_ordered[0] if indices is None else slice_coo(tensors_ordered[0], indices)
         t1 = t1.tocsr()
         for t2 in tensors_ordered[1:]:
             t1 = t1 @ t2
         result = csr2arr(t1)
     else:
-        # pandas join
-        t1_arr = coo2arr(t1)
-        df_path = pd.DataFrame(t1_arr).add_prefix('path_')
-        for t2 in tensors_ordered[1:]:
-            t2_arr = coo2arr(t2)
-            df_t2 = pd.DataFrame(t2_arr).add_prefix('t_')
-            df_path = df_path.merge(df_t2, left_on=df_path.columns[-1], right_on='t_0', how='left')
-            df_path = df_path.drop(columns=['t_0'])
-        df_path = df_path.sort_values(by=df_path.columns[0])
-        # result = df_path.fillna(-1).to_numpy(dtype=int)
-        result = df_path.to_numpy(dtype=int)
+        raise ValueError("keep_path must be False")
+    return result
+
+
+def trace_pandas(
+        tensors: list[coo_matrix],
+        direction: str = "backward",
+        indices: list[int] | None = None,
+        keep_path: bool = False
+):
+    # pandas join
+    if direction == "forward":
+        t1_arr = coo2arr(tensors[0])
+        df_path = pd.DataFrame(t1_arr).iloc[:, [1, 0]]
+        tensors_ordered = tensors[1:]
+        i_right_on = 1
+    elif direction == "backward":
+        t1_arr = coo2arr(tensors[-1])
+        df_path = pd.DataFrame(t1_arr)
+        tensors_ordered = tensors[-2::-1]
+        i_right_on = 0
+    else:
+        raise ValueError("direction must be 'forward' or 'backward'")
+
+    if indices is not None:
+        df_path = df_path[df_path.iloc[:, 0].isin(indices)]
+    for t in tensors_ordered:
+        t_arr = coo2arr(t)
+        df_t = pd.DataFrame(t_arr).add_prefix('t_')
+        df_path = df_path.merge(df_t, left_on=df_path.columns[-1], right_on=df_t.columns[i_right_on], how="inner")
+        df_path = df_path.drop(columns=[df_t.columns[i_right_on]])
+        if not keep_path:
+            df_path = df_path.iloc[:, [0, -1]]
+    df_path = df_path.sort_values(by=df_path.columns[0])
+    result = df_path.to_numpy(dtype=int)
 
     return result
+
+
+def trace_numpy(
+        tensors: list[coo_matrix],
+        direction: str = "backward",
+        indices: list[int] | None = None,
+        keep_path: bool = False
+):
+    # numpy
+    if direction == "forward":
+        t1_arr = coo2arr(tensors[0])
+        path_arr = t1_arr[:, [1, 0]]
+        tensors_ordered = tensors[1:]
+        i_right_on = 1
+    elif direction == "backward":
+        path_arr = coo2arr(tensors[-1])
+        tensors_ordered = tensors[-2::-1]
+        i_right_on = 0
+    else:
+        raise ValueError("direction must be 'forward' or 'backward'")
+
+    for t in tensors_ordered:
+        t_arr = coo2arr(t)
+        i, j = np.where(path_arr[:, -1, None] == t_arr[:, i_right_on])
+        if keep_path:
+            path_arr = np.column_stack([path_arr[i, :], t_arr[j, 1-i_right_on]])
+        else:
+            path_arr = np.column_stack([path_arr[i, 0], t_arr[j, 1-i_right_on]])
+
+    return path_arr
 
 
 def slice_coo(coo: coo_matrix, indices: list | np.ndarray) -> coo_matrix:
@@ -168,4 +224,3 @@ def slice_coo(coo: coo_matrix, indices: list | np.ndarray) -> coo_matrix:
     new_col = coo.col[mask]
     new_data = coo.data[mask]
     return coo_matrix((new_data, (new_row, new_col)), shape=coo.shape)
-
