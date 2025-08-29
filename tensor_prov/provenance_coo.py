@@ -1,16 +1,24 @@
 import time
+from collections import defaultdict
 
 import numpy as np
 import pandas as pd
 from scipy.sparse import coo_matrix
 
-from tensor_prov.utils import coo2arr, csr2arr
-from tensor_prov.utils_print import print_result_2d, print_result_3d
+from prov_graph import ProvGraph
+from prov_tree import ProvTree
+from utils import csr2arr, coo2arr
+from watched_pandas import WatchedDataFrame
 
 
 class Provenance:
-    def __init__(self):
-        self.step_count = 0
+    def __init__(self, verbose: int = 0):
+        self.graph = ProvTree()
+        self.verbose = verbose
+
+    def subscribe(self, df):
+        wdf = WatchedDataFrame(df, self)
+        return wdf
 
     def capture_time(func):
         def wrapper(self, *args, **kwargs):
@@ -22,111 +30,136 @@ class Provenance:
 
         return wrapper
 
-    def create_sparse_tensor(self, indices_out: np.ndarray, indices_in: np.ndarray, shape: tuple[int, int]):
-        """
-        Create a sparse tensor from indices.
-        """
-        data = np.ones(indices_out.shape[0], dtype=np.int8)
-        sparse_tensor = coo_matrix((data, (indices_out, indices_in)), shape=shape)
-        return sparse_tensor
-
-    # def save_result(self, operation: str, result):
-    #     sparse_tensor, bitset = result
-    #     self.step_count += 1
-    #     os.makedirs(self.save_dir, exist_ok=True)
-    #     filename = os.path.join(self.save_dir, f'step_{self.step_count}_{operation}.npz')
-    #     np.savez(
-    #         filename,
-    #         data=sparse_tensor.data,
-    #         row=sparse_tensor.row,
-    #         col=sparse_tensor.col,
-    #         shape=sparse_tensor.shape,
-    #         bitset=bitset
-    #     )
-
     @capture_time
     def capture(
             self,
-            df_in: pd.DataFrame | tuple[pd.DataFrame, pd.DataFrame],
+            df_in: pd.DataFrame | tuple[pd.DataFrame, ...],
             df_out: pd.DataFrame,
-            key_column: str | None = None,
-            column_mapping: dict | None = None
+            **kwargs
     ):
+        primary_key = kwargs.get("primary_key", None)
+        column_mapping = kwargs.get("column_mapping", None)
+
+        result = []
+
         if isinstance(df_in, pd.DataFrame):
-            tensor_record = self.capture_row_operation(df_in, df_out, key_column)
-            tensor_attr = self.capture_column_operation(df_in, df_out, column_mapping)
+            tensor_record = capture_row_operation(df_in, df_out, primary_key)
+            tensor_attr = capture_column_operation(df_in, df_out, column_mapping)
+            result.append((tensor_record, tensor_attr))
+            self.graph.add_child(df_in, df_out, (tensor_record, tensor_attr))
+
         elif isinstance(df_in, tuple):
-            if key_column is None:
-                raise ValueError("key_column cannot be None for Data Fusion")
-            df_in1, df_in2 = df_in
-            tensor_record1 = self.capture_row_operation(df_in1, df_out, key_column)
-            tensor_record2 = self.capture_row_operation(df_in2, df_out, key_column)
-            tensor_attr1 = self.capture_column_operation(df_in1, df_out, column_mapping)
-            tensor_attr2 = self.capture_column_operation(df_in2, df_out, column_mapping)
-            tensor_record = (tensor_record1, tensor_record2)
-            tensor_attr = (tensor_attr1, tensor_attr2)
+            if primary_key is None:
+                raise ValueError("primary_key is required")
+            elif isinstance(primary_key, str):
+                primary_key = tuple(primary_key for _ in df_in)
+
+            for d, p in zip(df_in, primary_key):
+                tensor_record = capture_row_operation(d, df_out, p)
+                tensor_attr = capture_column_operation(d, df_out, column_mapping)
+                result.append((tensor_record, tensor_attr))
+                self.graph.add_child(d, df_out, (tensor_record, tensor_attr))
         else:
-            raise ValueError("df_in must be a DataFrame or a tuple of DataFrames")
+            raise ValueError("df_in should be DataFrame or tuple[pd.DataFrame, pd.DataFrame] !")
 
-        return tensor_record, tensor_attr
+        return result
 
-    def capture_row_operation(self, df_in: pd.DataFrame, df_out: pd.DataFrame, key_column: str | None):
-        n_out, n_in = len(df_out), len(df_in)  # provenance shape (n_out, n_in)
-        ids_out = df_out.index.to_numpy() if key_column is None else df_out[key_column].to_numpy()
-        ids_in = df_in.index.to_numpy() if key_column is None else df_in[key_column].to_numpy()
-        indices_out, indices_in = np.where(ids_out[:, None] == ids_in[None, :])
 
-        # Create sparse tensor
-        sparse_tensor = self.create_sparse_tensor(indices_out, indices_in, (n_out, n_in))
+def create_sparse_tensor(
+        indices_out: np.ndarray,
+        indices_in: np.ndarray,
+        shape: tuple[int, int]
+):
+    """
+    Create a sparse tensor from indices.
+    """
+    data = np.ones(indices_out.shape[0], dtype=np.int8)
+    sparse_tensor = coo_matrix((data, (indices_out, indices_in)), shape=shape)
+    return sparse_tensor
 
-        return sparse_tensor
 
-    def capture_column_operation(self, df_in: pd.DataFrame, df_out: pd.DataFrame, column_mapping: dict | None):
-        cols_in = df_in.columns.values
-        cols_out = df_out.columns.values
-        n_out, n_in = len(cols_out), len(cols_in)
+def capture_row_operation(
+        df_in: pd.DataFrame,
+        df_out: pd.DataFrame,
+        primary_key: str | None
+):
+    n_out, n_in = len(df_out), len(df_in)  # provenance shape (n_out, n_in)
+    ids_out = df_out.index.to_numpy() if primary_key is None else df_out[primary_key].to_numpy()
+    ids_in = df_in.index.to_numpy() if primary_key is None else df_in[primary_key].to_numpy()
+    indices_out, indices_in = find_indices(ids_out, ids_in)
 
-        if column_mapping is None:
-            indices_out, indices_in = np.where(cols_out[:, None] == cols_in[None, :])
-        else:
-            out_to_in_map = {out: inp for inp, outs in column_mapping.items() for out in outs}
-            col_in_index = {col: idx for idx, col in enumerate(cols_in)}
-            mapped_in_cols = np.array([
-                col if col in col_in_index else out_to_in_map.get(col, None)
-                for col in cols_out
-            ])
-            indices_in = np.array([col_in_index[col] for col in mapped_in_cols])
-            indices_out = np.arange(len(cols_out))
+    # Create sparse tensor
+    sparse_tensor = create_sparse_tensor(indices_out, indices_in, (n_out, n_in))
 
-        # Create sparse tensor
-        sparse_tensor = self.create_sparse_tensor(indices_out, indices_in, (n_out, n_in))
+    return sparse_tensor
 
-        return sparse_tensor
+
+def capture_column_operation(
+        df_in: pd.DataFrame,
+        df_out: pd.DataFrame,
+        column_mapping: dict | None
+):
+    cols_in = df_in.columns.values
+    cols_out = df_out.columns.values
+    n_out, n_in = len(cols_out), len(cols_in)
+
+    if column_mapping is not None:
+        out_to_in = {col_out: col_in for col_in, cols_out in column_mapping.items() for col_out in cols_out}
+        cols_out = [out_to_in.get(col_out, col_out) for col_out in cols_out]
+
+    indices_out, indices_in = find_indices(cols_out, cols_in)
+
+    # Create sparse tensor
+    sparse_tensor = create_sparse_tensor(indices_out, indices_in, (n_out, n_in))
+
+    return sparse_tensor
+
+
+def find_indices(ids_out: np.ndarray, ids_in: np.ndarray):
+    # # I. np.where
+    # indices_out, indices_in = np.where(ids_out[:, None] == ids_in[None, :])
+
+    # # II. for loop
+    # indices_out, indices_in = [], []
+    # for out_idx, val_out in enumerate(ids_out):
+    #     for in_idx, val_in in enumerate(ids_in):
+    #         if val_out == val_in:
+    #             indices_out.append(out_idx)
+    #             indices_in.append(in_idx)
+    #
+    # indices_out = np.array(indices_out, dtype=np.int64)
+    # indices_in = np.array(indices_in, dtype=np.int64)
+
+    # III. dict and for loop
+    id_to_indices_in = defaultdict(list)
+    for idx_in, val in enumerate(ids_in):
+        id_to_indices_in[val].append(idx_in)
+
+    indices_out, indices_in = [], []
+    for out_idx, val in enumerate(ids_out):
+        if val in id_to_indices_in:
+            in_indices = id_to_indices_in[val]
+            indices_out.extend([out_idx] * len(in_indices))
+            indices_in.extend(in_indices)
+
+    indices_out = np.array(indices_out, dtype=np.int64)
+    indices_in = np.array(indices_in, dtype=np.int64)
+
+    return indices_out, indices_in
 
 
 def print_prov_result(
         df_in: pd.DataFrame | tuple[pd.DataFrame, pd.DataFrame],
         df_out: pd.DataFrame,
-        result: tuple,
+        result: list[tuple[coo_matrix, coo_matrix], ...],
         direction: str | None = None,
         num_examples: int = 5
 ):
     """
     Print the provenance result
     """
-    tensor_record, tensor_attr = result
-    arr_record = tensor_record if isinstance(tensor_record, np.ndarray) else coo2arr(tensor_record)
-    arr_attr = tensor_attr if isinstance(tensor_attr, np.ndarray) else coo2arr(tensor_attr)
-    karg = {
-        "tensor_record": tensor_record,
-        "tensor_attr": tensor_attr,
-        "arr_record": arr_record[:, [1, 0]] if direction == "forward" else arr_record,
-        "arr_attr": arr_attr[:, [1, 0]] if direction == "forward" else arr_attr,
-    }
-    if isinstance(df_in, pd.DataFrame):
-        print_result_2d(df_in, df_out, num_examples, **karg)
-    elif isinstance(df_in, tuple):
-        print_result_3d(df_in, df_out, num_examples, **karg)
+    for r in result:
+        print(r)
 
 
 def trace(
@@ -136,20 +169,28 @@ def trace(
         keep_path: bool = False
 ):
     if not keep_path:
-        # csr matrix multiplication
-        if direction == "forward":
-            tensors_ordered = [t.T for t in tensors]
-        elif direction == "backward":
-            tensors_ordered = tensors[::-1]
-        else:
-            raise ValueError("direction must be 'forward' or 'backward'")
-        t1 = tensors_ordered[0] if indices is None else slice_coo(tensors_ordered[0], indices)
-        t1 = t1.tocsr()
-        for t2 in tensors_ordered[1:]:
-            t1 = t1 @ t2
-        result = csr2arr(t1)
+        return trace_coo(tensors, direction=direction, indices=indices)
     else:
-        raise ValueError("keep_path must be False")
+        return trace_pandas(tensors, direction=direction, indices=indices, keep_path=keep_path)
+
+
+def trace_coo(
+        tensors: list[coo_matrix],
+        direction: str = "backward",
+        indices: list[int] | None = None
+):
+    # csr matrix multiplication （einsum）
+    if direction == "forward":
+        tensors_ordered = [t.T for t in tensors]
+    elif direction == "backward":
+        tensors_ordered = tensors[::-1]
+    else:
+        raise ValueError("direction must be 'forward' or 'backward'")
+    t1 = tensors_ordered[0] if indices is None else slice_coo(tensors_ordered[0], indices)
+    t1 = t1.tocsr()
+    for t2 in tensors_ordered[1:]:
+        t1 = t1 @ t2
+    result = csr2arr(t1)
     return result
 
 
@@ -211,9 +252,9 @@ def trace_numpy(
         t_arr = coo2arr(t)
         i, j = np.where(path_arr[:, -1, None] == t_arr[:, i_right_on])
         if keep_path:
-            path_arr = np.column_stack([path_arr[i, :], t_arr[j, 1-i_right_on]])
+            path_arr = np.column_stack([path_arr[i, :], t_arr[j, 1 - i_right_on]])
         else:
-            path_arr = np.column_stack([path_arr[i, 0], t_arr[j, 1-i_right_on]])
+            path_arr = np.column_stack([path_arr[i, 0], t_arr[j, 1 - i_right_on]])
 
     return path_arr
 

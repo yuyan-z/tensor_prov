@@ -49,13 +49,15 @@ class Provenance:
             self,
             df_in: pd.DataFrame | tuple[pd.DataFrame, pd.DataFrame],
             df_out: pd.DataFrame,
-            key_column: str,
+            key_column: str | None = None,
             column_mapping: dict | None = None
     ):
         if isinstance(df_in, pd.DataFrame):
             tensor_record = self.capture_row_operation(df_in, df_out, key_column)
             tensor_attr = self.capture_column_operation(df_in, df_out, column_mapping)
         elif isinstance(df_in, tuple):
+            if key_column is None:
+                raise ValueError("key_column cannot be None")
             df_in1, df_in2 = df_in
             tensor_record1 = self.capture_row_operation(df_in1, df_out, key_column)
             tensor_record2 = self.capture_row_operation(df_in2, df_out, key_column)
@@ -68,10 +70,10 @@ class Provenance:
 
         return tensor_record, tensor_attr
 
-    def capture_row_operation(self, df_in: pd.DataFrame, df_out: pd.DataFrame, key_column: str):
+    def capture_row_operation(self, df_in: pd.DataFrame, df_out: pd.DataFrame, key_column: str | None):
         n_out, n_in = len(df_out), len(df_in)  # provenance shape (n_out, n_in)
-        ids_out = df_out[key_column].to_numpy()
-        ids_in = df_in[key_column].to_numpy()
+        ids_out = df_out.index.to_numpy() if key_column is None else df_out[key_column].to_numpy()
+        ids_in = df_in.index.to_numpy() if key_column is None else df_in[key_column].to_numpy()
         indices_out, indices_in = np.where(ids_out[:, None] == ids_in[None, :])
 
         # Create sparse tensor
@@ -105,7 +107,7 @@ class Provenance:
 def print_prov_result(
         df_in: pd.DataFrame | tuple[pd.DataFrame, pd.DataFrame],
         df_out: pd.DataFrame,
-        result: tuple[csr_matrix, csr_matrix] | tuple[tuple[csr_matrix, csr_matrix], csr_matrix],
+        result: tuple,
         num_examples: int = 5
 ):
     """
@@ -115,8 +117,8 @@ def print_prov_result(
     karg = {
         "tensor_record": tensor_record,
         "tensor_attr": tensor_attr,
-        "arr_record": csr2arr(tensor_record),
-        "arr_attr": csr2arr(tensor_attr)
+        "arr_record": tensor_record if isinstance(tensor_record, np.ndarray) else csr2arr(tensor_record),
+        "arr_attr": tensor_attr if isinstance(tensor_attr, np.ndarray) else csr2arr(tensor_attr)
     }
     if isinstance(df_in, pd.DataFrame):
         print_result_2d(df_in, df_out, num_examples, **karg)

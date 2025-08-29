@@ -10,19 +10,15 @@ def print_result_2d(
         arr_record: list,
         arr_attr: list
 ):
-    print("-- D_in --\n")
-    print(df_in)
-    print("\n-- D_out --\n")
-    print(df_out)
     print("\n-- Record tensor --\n")
     print(tensor_record)
     print("\n-- Record examples --\n")
     record_examples = list(arr_record[:num_examples])
     for idx_out, idx_in in record_examples:
         print(f"D_out[{idx_out}] is from D_in[{idx_in}]: ")
-        print(f"\t{df_out.iloc[idx_out].tolist()}")
+        print(f"\t{df_out.iloc[[idx_out]]}")
         print("\tis from")
-        print(f"\t{df_in.iloc[idx_in].tolist()}\n")
+        print(f"\t{df_in.iloc[[idx_in]]}\n")
     if len(arr_record) > num_examples:
         print(f"... {len(arr_record)} items in total.")
 
@@ -35,7 +31,7 @@ def print_result_2d(
 
         attr_examples = list(arr_attr)
         for idx_out, idx_in in attr_examples:
-            print(f"D_out[{cols_out[idx_out]}] is from D_in[{cols_in[idx_in]}]: ")
+            print(f"D_out[{cols_out[idx_out]}] is from D_in[{cols_in[idx_in]}]")
 
 
 def print_result_3d(
@@ -48,14 +44,6 @@ def print_result_3d(
         arr_attr: list
 ):
     df_left, df_right = dfs_in
-
-    print("-- D_left --\n")
-    print(df_left)
-    print("\n-- D_right --\n")
-    print(df_right)
-    print("\n-- D_out --\n")
-    print(df_out)
-
     print("\n-- Record tensor --\n")
     if isinstance(tensor_record, tuple):
         print(tensor_record[0])
