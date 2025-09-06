@@ -4,7 +4,6 @@ from scipy.sparse import coo_matrix
 
 from provenance_base import ProvenanceBase
 from utils_type import csr2arr, coo2arr
-from watched_pandas import WatchedDataFrame
 
 
 class Provenance(ProvenanceBase):
@@ -41,7 +40,7 @@ def trace(
         direction: str = "backward",
         indices: list[int] | None = None,
         keep_path: bool = False
-):
+) -> np.ndarray:
     if not keep_path:
         return trace_coo(tensors, direction=direction, indices=indices)
     else:
@@ -52,7 +51,7 @@ def trace_coo(
         tensors: list[coo_matrix],
         direction: str = "backward",
         indices: list[int] | None = None
-):
+) -> np.ndarray:
     # csr matrix multiplication （einsum）
     if direction == "forward":
         tensors_ordered = [t.T for t in tensors]
@@ -73,7 +72,7 @@ def trace_pandas(
         direction: str = "backward",
         indices: list[int] | None = None,
         keep_path: bool = False
-):
+) -> np.ndarray:
     # pandas join
     if direction == "forward":
         t1_arr = coo2arr(tensors[0])
@@ -93,7 +92,7 @@ def trace_pandas(
         df_path = df_path[df_path.iloc[:, 0].isin(indices)]
     for i, t in enumerate(tensors_ordered):
         t_arr = coo2arr(t)
-        df_t = pd.DataFrame(t_arr, columns=["out", "in"]).add_prefix(f't_{i+1}_')
+        df_t = pd.DataFrame(t_arr, columns=["out", "in"]).add_prefix(f't_{i + 1}_')
         df_path = df_path.merge(df_t, left_on=df_path.columns[-1], right_on=df_t.columns[i_right_on], how="inner")
         df_path = df_path.drop(columns=[df_t.columns[i_right_on]])
         if not keep_path:
@@ -102,37 +101,6 @@ def trace_pandas(
     result = df_path.to_numpy(dtype=int)
 
     return result
-
-
-def trace_numpy(
-        tensors: list[coo_matrix],
-        direction: str = "backward",
-        indices: list[int] | None = None,
-        keep_path: bool = False
-):
-    # numpy
-    if direction == "forward":
-        t1_arr = coo2arr(tensors[0])
-        path_arr = t1_arr[:, [1, 0]]
-        tensors_ordered = tensors[1:]
-        i_right_on = 1
-    elif direction == "backward":
-        path_arr = coo2arr(tensors[-1])
-        tensors_ordered = tensors[-2::-1]
-        i_right_on = 0
-    else:
-        raise ValueError("direction must be 'forward' or 'backward'")
-
-    for t in tensors_ordered:
-        t_arr = coo2arr(t)
-        i, j = np.where(path_arr[:, -1, None] == t_arr[:, i_right_on])
-        if keep_path:
-            path_arr = np.column_stack([path_arr[i, :], t_arr[j, 1 - i_right_on]])
-        else:
-            path_arr = np.column_stack([path_arr[i, 0], t_arr[j, 1 - i_right_on]])
-
-    return path_arr
-
 
 def slice_coo(coo: coo_matrix, indices: list | np.ndarray) -> coo_matrix:
     mask = np.isin(coo.row, indices)
