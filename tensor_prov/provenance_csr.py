@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 from scipy.sparse import csr_matrix
 
-from tensor_prov.utils import csr2arr
+from tensor_prov.utils_type import csr2arr
 from tensor_prov.utils_print import print_result_2d, print_result_3d
 
 

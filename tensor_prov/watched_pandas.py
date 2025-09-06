@@ -1,86 +1,101 @@
 from __future__ import annotations
 
+from collections import defaultdict
+
 import pandas as pd
+
+from utils import get_merge_column_mapping
 
 
 class WatchedDataFrame:
-    is_watching = True
     is_tracking = True
 
-    def __init__(self, df, prov):
-        self._df = df
-        self._prov = prov
-        self.id = prov.graph.new_id()
+    def __init__(self, df, prov, i=None):
+        self.df = df.copy()
+        self.prov = prov
+        self.id = prov.graph.new_id() if i is None else i
 
-    def get_df(self) -> pd.DataFrame:
-        return self._df.copy()
-
-    def set_df(self, df_new: pd.DataFrame):
-        if WatchedDataFrame.is_tracking:
-            df_old = self._df.copy()
-            id_old = self.id
-            self._df = df_new
-            self.id = self._prov.graph.new_id()
-            self._prov.capture(df_old, self._df, id_old, self.id)
-        else:
-            self._df = df_new
-            self.id = self._prov.graph.new_id()
+    def set(self, new: pd.DataFrame | WatchedDataFrame, **kwargs):
+        if isinstance(new, pd.DataFrame):
+            new_id = self.prov.graph.new_id()
+            if WatchedDataFrame.is_tracking:
+                self.prov.capture(self.df, new, id_in=self.id, id_out=new_id, **kwargs)
+            self.df = new
+            self.id = new_id
+        elif isinstance(new, WatchedDataFrame):
+            if WatchedDataFrame.is_tracking:
+                self.prov.capture(self, new, **kwargs)
+            self.df = new.df
+            self.id = new.id
 
     def __setitem__(self, key, value):
         # print("__setitem__")
         if WatchedDataFrame.is_tracking:
-            df_old = self._df.copy()
-            id_old = self.id
-            self._df[key] = value
-            self.id = self._prov.graph.new_id()
-            self._prov.capture(df_old, self._df, id_old, self.id)
+            wdf_old = WatchedDataFrame(self.df, self.prov, self.id)
+            self.df[key] = value
+            self.id = self.prov.graph.new_id()
+            self.prov.capture(wdf_old, self)
         else:
-            self._df[key] = value
-            self.id = self._prov.graph.new_id()
+            self.df[key] = value
+            self.id = self.prov.graph.new_id()
 
     def __getitem__(self, key):
         # print("__getitem__")
-        result = self._df[key]
-        if isinstance(result, pd.DataFrame) and WatchedDataFrame.is_watching:
-            result = WatchedDataFrame(result, self._prov)
+        result = self.df[key]
+        if isinstance(result, pd.DataFrame):
+            result = WatchedDataFrame(result, self.prov)
             if WatchedDataFrame.is_tracking:
-                self._prov.capture(self._df, result._df, self.id, result.id)
+                self.prov.capture(self, result)
         return result
 
     def __getattr__(self, attr):
         # print("__getattr__", attr)
-        orig_attr = getattr(self._df, attr)
+        orig_attr = getattr(self.df, attr)
         if callable(orig_attr) and not attr.startswith("_"):
 
             def hooked(*args, **kwargs):
                 # inplace methods
                 if kwargs.get('inplace', False):
                     if WatchedDataFrame.is_tracking:
-                        df_old = self._df.copy()
-                        id_old = self.id
+                        wdf_old = WatchedDataFrame(self.df, self.prov, self.id)
                         result = orig_attr(*args, **kwargs)
-                        self.id = self._prov.graph.new_id()
-                        self._prov.capture(df_old, self._df, id_old, self.id)
+                        self.id = self.prov.graph.new_id()
+                        self.prov.capture(wdf_old, self)
                     else:
                         result = orig_attr(*args, **kwargs)
-                        self.id = self._prov.graph.new_id()
+                        self.id = self.prov.graph.new_id()
                 # return new object methods
                 else:
                     if attr == "merge":
-                        WatchedDataFrame.is_watching = False
-                    result = orig_attr(*args, **kwargs)
-                    if attr == "merge":
-                        WatchedDataFrame.is_watching = True
-                        result = WatchedDataFrame(result, self._prov)
-                        if WatchedDataFrame.is_tracking:
-                            right_wdf = args[0]
-                            merge_key = get_merge_key(kwargs)
-                            self._prov.capture((self._df, right_wdf._df), result._df, (self.id, right_wdf.id), result.id,
-                                               primary_key=merge_key)
-                    elif isinstance(result, pd.DataFrame) and WatchedDataFrame.is_watching:
-                        result = WatchedDataFrame(result, self._prov)
-                        if WatchedDataFrame.is_tracking:
-                            self._prov.capture(self._df, result._df, self.id, result.id)
+                        left_df = self.df.copy()
+                        left_df["primary_key_x"] = range(len(left_df))
+                        if kwargs.get("right", None):
+                            right_wdf = kwargs.pop("right")
+                        else:
+                            right_wdf, *args = args
+                        right_df = right_wdf.df.copy()
+                        right_df["primary_key_y"] = range(len(right_df))
+                        result = left_df.merge(right_df, *args, **kwargs)
+                        column_mapping = get_merge_column_mapping(self.df.columns, right_wdf.df.columns,
+                                                                  result.columns)
+                        new_id = self.prov.graph.new_id()
+                        self.prov.capture(
+                            [left_df, right_df],
+                            result,
+                            id_in=[self.id, right_wdf.id],
+                            id_out=new_id,
+                            primary_key=["primary_key_x", "primary_key_y"],
+                            column_mapping=column_mapping,
+                            column_ignore=["primary_key_x", "primary_key_y"]
+                        )
+                        result = result.drop(columns=["primary_key_x", "primary_key_y"])
+                        result = WatchedDataFrame(result, self.prov, new_id)
+                    else:
+                        result = orig_attr(*args, **kwargs)
+                        if isinstance(result, pd.DataFrame):
+                            result = WatchedDataFrame(result, self.prov)
+                            if WatchedDataFrame.is_tracking:
+                                self.prov.capture(self, result)
                 return result
 
             return hooked
@@ -89,14 +104,14 @@ class WatchedDataFrame:
 
     @property
     def loc(self):
-        return _WatchedIndexer(self, self._df.loc)
+        return _WatchedIndexer(self, self.df.loc)
 
     @property
     def iloc(self):
-        return _WatchedIndexer(self, self._df.iloc)
+        return _WatchedIndexer(self, self.df.iloc)
 
     def __len__(self):
-        return len(self._df)
+        return len(self.df)
 
 
 class _WatchedIndexer:
@@ -107,40 +122,29 @@ class _WatchedIndexer:
     def __getitem__(self, key):
         # print("_WatchedIndexer __getitem__")
         result = self._indexer[key]
-        if isinstance(result, pd.DataFrame) and WatchedDataFrame.is_watching:
-            prov = self._wdf._prov
+        if isinstance(result, pd.DataFrame):
+            prov = self._wdf.prov
             result = WatchedDataFrame(result, prov)
             if WatchedDataFrame.is_tracking:
-                prov.capture(self._wdf._df, result._df, self._wdf.id, result.id)
+                prov.capture(self._wdf, result)
         return result
 
     def __setitem__(self, key, value):
         # print("_WatchedIndexer __setitem__")
         if WatchedDataFrame.is_tracking:
-            df_old = self._wdf._df.copy()
-            id_old = self._wdf.id
+            wdf_old = WatchedDataFrame(self._wdf.df, self._wdf.prov, self._wdf.id)
             self._indexer[key] = value
-            self._wdf.id = self._wdf._prov.graph.new_id()
-            self._wdf._prov.capture(df_old, self._wdf._df, id_old, self._wdf.id)
+            self._wdf.id = self._wdf.prov.graph.new_id()
+            self._wdf.prov.capture(wdf_old, self._wdf)
         else:
             self._indexer[key] = value
-            self._wdf.id = self._wdf._prov.graph.new_id()
+            self._wdf.id = self._wdf.prov.graph.new_id()
 
-
-def get_merge_key(kwargs):
-    if "on" in kwargs and kwargs["on"] is not None:
-        merge_key = kwargs["on"]
-    else:
-        merge_key = (kwargs["left_on"], kwargs["right_on"])
-    return merge_key
-
-
-def merge(left_wdf: WatchedDataFrame, right_wdf: WatchedDataFrame, *args, **kwargs):
-    left_df = left_wdf._df
-    right_df = right_wdf._df
-    result = pd.merge(left_df, right_df, *args, **kwargs)
-    prov = left_wdf._prov
-    result = WatchedDataFrame(result, prov)
-    merge_key = get_merge_key(kwargs)
-    prov.capture((left_df, right_df), result._df, (left_wdf.id, right_wdf.id), result.id, primary_key=merge_key)
-    return result
+# def merge(left_wdf: WatchedDataFrame, right_wdf: WatchedDataFrame, *args, **kwargs):
+#     result = pd.merge(left_wdf.df, right_wdf.df, *args, **kwargs)
+#     prov = left_wdf.prov
+#     result = WatchedDataFrame(result, prov)
+#     if WatchedDataFrame.is_tracking:
+#         merge_key, column_mapping = _get_merge_key(kwargs, result.columns)
+#         prov.capture([left_wdf, right_wdf], result, primary_key=merge_key, column_mapping=column_mapping)
+#     return result

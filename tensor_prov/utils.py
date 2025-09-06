@@ -1,46 +1,9 @@
-import numpy as np
-import pandas as pd
-from scipy.sparse import coo_matrix, csr_matrix
-
-
-def coo2arr(coo: coo_matrix | tuple[coo_matrix, coo_matrix]):
-    if isinstance(coo, coo_matrix):
-        arr = np.vstack((
-            coo.row,
-            coo.col
-        )).T
-    else:
-        df_A = pd.DataFrame({
-            "idx_out": coo[0].row,
-            "idx_left": coo[0].col,
-        })
-        df_B = pd.DataFrame({
-            "idx_out": coo[1].row,
-            "idx_right": coo[1].col,
-        })
-        df = pd.merge(df_A, df_B, on="idx_out", how="outer")
-        arr = df.fillna(-1).to_numpy(dtype=int)
-
-    return arr
-
-
-def csr2arr(csr: csr_matrix | tuple[csr_matrix, csr_matrix]):
-    if isinstance(csr, csr_matrix):
-        row, col = csr.nonzero()
-        arr = np.vstack((row, col)).T
-    else:
-        A_row, A_col = csr[0].nonzero()
-        B_row, B_col = csr[1].nonzero()
-
-        df_A = pd.DataFrame({
-            "idx_out": A_row,
-            "idx_left": A_col,
-        })
-        df_B = pd.DataFrame({
-            "idx_out": B_row,
-            "idx_right": B_col,
-        })
-        df = pd.merge(df_A, df_B, on="idx_out", how="outer")
-        arr = df.fillna(-1).to_numpy(dtype=int)
-
-    return arr
+def get_merge_column_mapping(cols_left, cols_right, cols_out, suffixes=("_x", "_y")):
+    column_mapping = [{}, {}]
+    cols_overlap = set(cols_left).intersection(cols_right)
+    for col in cols_overlap:
+        if f"{col}{suffixes[0]}" in cols_out:
+            column_mapping[0][col] = [f"{col}{suffixes[0]}"]
+        if f"{col}{suffixes[1]}" in cols_out:
+            column_mapping[1][col] = [f"{col}{suffixes[1]}"]
+    return column_mapping
