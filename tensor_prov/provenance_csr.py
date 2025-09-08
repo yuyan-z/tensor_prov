@@ -75,8 +75,8 @@ def trace_pandas(
     # pandas join
     if direction == "forward":
         t1_arr = csr2arr(tensors[0])
-        df_path = pd.DataFrame(t1_arr, columns=["out", "in"])
-        df_path = df_path[["in", "out"]]
+        df_path = pd.DataFrame(t1_arr, columns=["t_0_out", "in"])
+        df_path = df_path[["in", "t_0_out"]]
         tensors_ordered = tensors[1:]
         i_right_on = 1
     elif direction == "backward":

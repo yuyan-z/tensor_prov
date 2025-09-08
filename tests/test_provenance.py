@@ -1,8 +1,10 @@
 import numpy as np
 import pandas as pd
 
-from provenance_coo import Provenance, trace
+# from provenance_coo import Provenance, trace
 # from provenance_csr import Provenance, trace
+from provenance_pandas import Provenance, trace
+
 
 user_df = pd.DataFrame({
     "ID": [10, 20, 30, 40],

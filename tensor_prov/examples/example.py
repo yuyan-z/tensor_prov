@@ -1,7 +1,8 @@
 import numpy as np
 import pandas as pd
 
-from provenance_coo import Provenance, trace
+# from provenance_coo import Provenance, trace
+from provenance_pandas import Provenance, trace
 
 user_df = pd.DataFrame({
     "ID": [10, 20, 30, 40],
@@ -16,7 +17,7 @@ post_df = pd.DataFrame({
     "Topic": ["Art", "Football", "Travel", "Travel"]
 })
 
-prov = Provenance(verbose=1)
+prov = Provenance(verbose=0)
 user_wdf = prov.subscribe(user_df)
 post_wdf = prov.subscribe(post_df)
 
