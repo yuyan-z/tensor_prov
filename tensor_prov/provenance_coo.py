@@ -1,6 +1,9 @@
+import os
+
 import numpy as np
 import pandas as pd
 from scipy.sparse import coo_matrix
+import scipy.sparse as sp
 
 from provenance_base import ProvenanceBase
 from utils_type import csr2arr, coo2arr
@@ -33,6 +36,22 @@ class Provenance(ProvenanceBase):
         # print(tensor_record.todense())
         print("-- tensor_attr --\n", coo2arr(tensor_attr))
         # print(tensor_attr.todense())
+
+    def save_prov_result(
+            self,
+            id_in: int,
+            id_out: int,
+            result: tuple[coo_matrix, coo_matrix]
+    ) -> None:
+        """
+          <save_dir>/<id_in>_<id_out>_record.npz
+          <save_dir>/<id_in>_<id_out>_attr.npz
+        """
+        tensor_record, tensor_attr = result
+        rec_path = os.path.join(self.save_dir, f"{id_in}_{id_out}_record.npz")
+        attr_path = os.path.join(self.save_dir, f"{id_in}_{id_out}_attr.npz")
+        sp.save_npz(rec_path, tensor_record)
+        sp.save_npz(attr_path, tensor_attr)
 
 
 def trace(
@@ -101,6 +120,7 @@ def trace_pandas(
     result = df_path.to_numpy(dtype=int)
 
     return result
+
 
 def slice_coo(coo: coo_matrix, indices: list | np.ndarray) -> coo_matrix:
     mask = np.isin(coo.row, indices)

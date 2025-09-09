@@ -1,8 +1,8 @@
 import numpy as np
 import pandas as pd
 
-# from provenance_coo import Provenance, trace
-from provenance_pandas import Provenance, trace
+from provenance_coo import Provenance, trace
+# from provenance_pandas import Provenance, trace
 
 user_df = pd.DataFrame({
     "ID": [10, 20, 30, 40],
@@ -17,7 +17,7 @@ post_df = pd.DataFrame({
     "Topic": ["Art", "Football", "Travel", "Travel"]
 })
 
-prov = Provenance(verbose=0)
+prov = Provenance(save_dir="results_coo", verbose=0)
 user_wdf = prov.subscribe(user_df)
 post_wdf = prov.subscribe(post_df)
 
@@ -79,4 +79,13 @@ def example_trace():
 
 if __name__ == "__main__":
     example_capture()
-    example_trace()
+    prov.save_graph()
+
+    # prov.load_result()
+    # print(prov.graph.new_id())
+    # example_trace()
+
+    # import scipy.sparse as sp
+    # B = sp.load_npz("results/1_5_attr.npz")
+    # print(B)
+

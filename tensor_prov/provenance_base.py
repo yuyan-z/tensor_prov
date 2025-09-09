@@ -1,3 +1,4 @@
+import os
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from typing import Any
@@ -10,7 +11,9 @@ from watched_pandas import WatchedDataFrame
 
 
 class ProvenanceBase(ABC):
-    def __init__(self, verbose: int = 0):
+    def __init__(self, save_dir: str, verbose: int = 0):
+        self.save_dir = save_dir
+        os.makedirs(self.save_dir, exist_ok=True)
         self.graph = ProvGraph()
         self.verbose = verbose
 
@@ -46,7 +49,7 @@ class ProvenanceBase(ABC):
                 primary_key = [primary_key] * len(d_in)
             if not isinstance(column_mapping, list):
                 column_mapping = [column_mapping] * len(d_in)
-            column_ignore = kwargs.get("column_ignore", False)
+            column_ignore = kwargs.get("column_ignore", [])
 
             result = []
             if isinstance(d_out, WatchedDataFrame):
@@ -91,6 +94,8 @@ class ProvenanceBase(ABC):
             else:
                 self.print_prov_result(df_in, df_out, id_in, id_out, result)
 
+        self.save_prov_result(id_in, id_out, result)
+
         return result
 
     def capture_row_operation(
@@ -128,7 +133,8 @@ class ProvenanceBase(ABC):
             column_ignore: list[str] | None
     ) -> Any:
         cols_in = df_in.columns.drop(column_ignore, errors="ignore").values if column_ignore else df_in.columns.values
-        cols_out = df_out.columns.drop(column_ignore, errors="ignore").values if column_ignore else df_out.columns.values
+        cols_out = df_out.columns.drop(column_ignore,
+                                       errors="ignore").values if column_ignore else df_out.columns.values
         n_out, n_in = len(cols_out), len(cols_in)
 
         if column_mapping is not None:
@@ -141,6 +147,13 @@ class ProvenanceBase(ABC):
         sparse_tensor = self.create_sparse_tensor(indices_out, indices_in, (n_out, n_in))
 
         return sparse_tensor
+
+    def save_graph(self):
+        graph_json = self.graph.save_graph(self.save_dir)
+        return graph_json
+
+    def load_result(self):
+        self.graph.load_graph(self.save_dir)
 
     @abstractmethod
     def create_sparse_tensor(
@@ -163,6 +176,19 @@ class ProvenanceBase(ABC):
             id_out: int,
             result: tuple[Any, Any]
     ) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def save_prov_result(
+            self,
+            id_in: int,
+            id_out: int,
+            result: tuple[Any, Any]
+    ) -> None:
+        """
+          <save_dir>/<id_in>_<id_out>_record.npz
+          <save_dir>/<id_in>_<id_out>_attr.npz
+        """
         raise NotImplementedError
 
 

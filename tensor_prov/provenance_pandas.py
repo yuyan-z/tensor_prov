@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 import pandas as pd
 
@@ -31,6 +33,20 @@ class Provenance(ProvenanceBase):
         (tensor_record, tensor_attr) = result
         print("-- tensor_record --\n", tensor_record.to_numpy())
         print("-- tensor_attr --\n", tensor_attr.to_numpy())
+
+    def save_prov_result(
+            self,
+            id_in: int,
+            id_out: int,
+            result: tuple[pd.DataFrame, pd.DataFrame]
+    ) -> None:
+        tensor_record, tensor_attr = result
+        rec_path = os.path.join(self.save_dir, f"{id_in}_{id_out}_record.npz")
+        attr_path = os.path.join(self.save_dir, f"{id_in}_{id_out}_attr.npz")
+        np.savez(rec_path, **{col: tensor_record[col].to_numpy()
+                              for col in tensor_record.columns})
+        np.savez(attr_path, **{col: tensor_attr[col].to_numpy()
+                               for col in tensor_attr.columns})
 
 
 def trace(

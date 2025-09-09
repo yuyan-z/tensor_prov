@@ -67,7 +67,7 @@ class WatchedDataFrame:
                 # return new object methods
                 else:
                     if attr == "merge":
-                        result = self._hook_merge(*args, **kwargs)
+                        result = _hook_merge(self, *args, **kwargs)
                     else:
                         result = orig_attr(*args, **kwargs)
                         if isinstance(result, pd.DataFrame):
@@ -90,32 +90,6 @@ class WatchedDataFrame:
 
     def __len__(self):
         return len(self.df)
-
-    def _hook_merge(self, *args, **kwargs):
-        left_df = self.df.copy()
-        left_df["primary_key_x"] = range(len(left_df))
-        if kwargs.get("right", None):
-            right_wdf = kwargs.pop("right")
-        else:
-            right_wdf, *args = args
-        right_df = right_wdf.df.copy()
-        right_df["primary_key_y"] = range(len(right_df))
-        result = left_df.merge(right_df, *args, **kwargs)
-        column_mapping = get_merge_column_mapping(self.df.columns, right_wdf.df.columns,
-                                                  result.columns)
-        new_id = self.prov.graph.new_id()
-        self.prov.capture(
-            [left_df, right_df],
-            result,
-            id_in=[self.id, right_wdf.id],
-            id_out=new_id,
-            primary_key=["primary_key_x", "primary_key_y"],
-            column_mapping=column_mapping,
-            column_ignore=["primary_key_x", "primary_key_y"]
-        )
-        result = result.drop(columns=["primary_key_x", "primary_key_y"])
-        result = WatchedDataFrame(result, self.prov, new_id)
-        return result
 
 
 class _WatchedIndexer:
@@ -144,11 +118,29 @@ class _WatchedIndexer:
             self._indexer[key] = value
             self._wdf.id = self._wdf.prov.graph.new_id()
 
-# def merge(left_wdf: WatchedDataFrame, right_wdf: WatchedDataFrame, *args, **kwargs):
-#     result = pd.merge(left_wdf.df, right_wdf.df, *args, **kwargs)
-#     prov = left_wdf.prov
-#     result = WatchedDataFrame(result, prov)
-#     if WatchedDataFrame.is_tracking:
-#         merge_key, column_mapping = _get_merge_key(kwargs, result.columns)
-#         prov.capture([left_wdf, right_wdf], result, primary_key=merge_key, column_mapping=column_mapping)
-#     return result
+
+def _hook_merge(left_wdf: WatchedDataFrame, *args, **kwargs):
+    left_df = left_wdf.df.copy()
+    left_df["primary_key_x"] = range(len(left_df))
+    if kwargs.get("right", None):
+        right_wdf = kwargs.pop("right")
+    else:
+        right_wdf, *args = args
+    right_df = right_wdf.df.copy()
+    right_df["primary_key_y"] = range(len(right_df))
+    result = left_df.merge(right_df, *args, **kwargs)
+    column_mapping = get_merge_column_mapping(left_wdf.df.columns, right_wdf.df.columns,
+                                              result.columns)
+    new_id = left_wdf.prov.graph.new_id()
+    left_wdf.prov.capture(
+        [left_df, right_df],
+        result,
+        id_in=[left_wdf.id, right_wdf.id],
+        id_out=new_id,
+        primary_key=["primary_key_x", "primary_key_y"],
+        column_mapping=column_mapping,
+        column_ignore=["primary_key_x", "primary_key_y"]
+    )
+    result = result.drop(columns=["primary_key_x", "primary_key_y"])
+    result = WatchedDataFrame(result, left_wdf.prov, new_id)
+    return result
