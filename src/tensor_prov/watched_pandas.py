@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from collections import defaultdict
-
 import pandas as pd
 
 from .utils import get_merge_column_mapping
