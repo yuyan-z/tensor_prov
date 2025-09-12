@@ -3,8 +3,6 @@ import os
 
 import networkx as nx
 import itertools
-
-import numpy as np
 from matplotlib import pyplot as plt
 
 
@@ -68,7 +66,7 @@ class ProvGraph:
             json.dump(graph_json, f, ensure_ascii=False, indent=2)
         return graph_json
 
-    def load_graph(self, file_dir: str):
+    def load_graph(self, file_dir: str, prov):
         file_path = os.path.join(file_dir, "graph.json")
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"{file_path} not found")
@@ -87,7 +85,11 @@ class ProvGraph:
         # Add edges
         for e in graph_json.get("edges", []):
             u, v = e["src"], e["dst"]
-            self.G.add_edge(u, v)
+            if u == self.root:
+                self.G.add_edge(u, v)
+            else:
+                edge_obj = prov.load_prov_result(u, v)
+                self.G.add_edge(u, v, obj=edge_obj)
 
         # Set _id_counter
         next_id = (max(nodes) + 1) if nodes else 1

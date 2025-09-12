@@ -1,7 +1,7 @@
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, to_date, year, month, dayofmonth, when
 
-from tensor_prov.provenance_spark import Provenance
+from provenance_spark import Provenance
 
 spark = SparkSession.builder.appName("Provenance").getOrCreate()
 
@@ -116,7 +116,7 @@ if __name__ == "__main__":
     # example_trace(direction="forward")
 
 
-from pyspark.sql import SparkSession, DataFrame
+from pyspark.sql import SparkSession
 
 spark = SparkSession.builder.appName("Provenance").getOrCreate()
 

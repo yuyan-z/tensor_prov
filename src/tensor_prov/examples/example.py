@@ -17,7 +17,7 @@ post_df = pd.DataFrame({
     "Topic": ["Art", "Football", "Travel", "Travel"]
 })
 
-prov = Provenance(save_dir="results_coo", verbose=0)
+prov = Provenance(save_dir="results_coo", verbose=1)
 user_wdf = prov.subscribe(user_df)
 post_wdf = prov.subscribe(post_df)
 
@@ -78,14 +78,9 @@ def example_trace():
 
 
 if __name__ == "__main__":
-    example_capture()
-    prov.save_graph()
-
-    # prov.load_result()
+    # example_capture()
+    prov.load()
     # print(prov.graph.new_id())
-    # example_trace()
+    example_trace()
 
-    # import scipy.sparse as sp
-    # B = sp.load_npz("results/1_5_attr.npz")
-    # print(B)
 

@@ -1,6 +1,8 @@
 import os
+import time
 from abc import ABC, abstractmethod
 from collections import defaultdict
+from functools import wraps
 from typing import Any
 
 import numpy as np
@@ -8,6 +10,20 @@ import pandas as pd
 
 from prov_graph import ProvGraph
 from watched_pandas import WatchedDataFrame
+
+
+def capture_time(func):
+    @wraps(func)
+    def wrapper(self, *args, **kwargs):
+        start = time.time()
+        result = func(self, *args, **kwargs)
+        runtime = time.time() - start
+        self.last_runtime = runtime
+        # if self.verbose > 0:
+        #     print(f"\n[{func.__name__}] Runtime: {runtime:.4f} s")
+        return result
+
+    return wrapper
 
 
 class ProvenanceBase(ABC):
@@ -27,6 +43,7 @@ class ProvenanceBase(ABC):
     def start(self):
         WatchedDataFrame.is_tracking = True
 
+    @capture_time
     def capture(
             self,
             d_in: pd.DataFrame | list[pd.DataFrame] | WatchedDataFrame | list[WatchedDataFrame],
@@ -95,6 +112,7 @@ class ProvenanceBase(ABC):
                 self.print_prov_result(df_in, df_out, id_in, id_out, result)
 
         self.save_prov_result(id_in, id_out, result)
+        self.graph.save_graph(self.save_dir)
 
         return result
 
@@ -148,12 +166,8 @@ class ProvenanceBase(ABC):
 
         return sparse_tensor
 
-    def save_graph(self):
-        graph_json = self.graph.save_graph(self.save_dir)
-        return graph_json
-
-    def load_result(self):
-        self.graph.load_graph(self.save_dir)
+    def load(self):
+        self.graph.load_graph(self.save_dir, self)
 
     @abstractmethod
     def create_sparse_tensor(
@@ -189,6 +203,14 @@ class ProvenanceBase(ABC):
           <save_dir>/<id_in>_<id_out>_record.npz
           <save_dir>/<id_in>_<id_out>_attr.npz
         """
+        raise NotImplementedError
+
+    @abstractmethod
+    def load_prov_result(
+            self,
+            id_in: int,
+            id_out: int
+    ) -> Any:
         raise NotImplementedError
 
 

@@ -43,15 +43,22 @@ class Provenance(ProvenanceBase):
             id_out: int,
             result: tuple[coo_matrix, coo_matrix]
     ) -> None:
-        """
-          <save_dir>/<id_in>_<id_out>_record.npz
-          <save_dir>/<id_in>_<id_out>_attr.npz
-        """
         tensor_record, tensor_attr = result
         rec_path = os.path.join(self.save_dir, f"{id_in}_{id_out}_record.npz")
         attr_path = os.path.join(self.save_dir, f"{id_in}_{id_out}_attr.npz")
         sp.save_npz(rec_path, tensor_record)
         sp.save_npz(attr_path, tensor_attr)
+
+    def load_prov_result(
+            self,
+            id_in: int,
+            id_out: int
+    ) -> tuple[coo_matrix, coo_matrix]:
+        rec_path = os.path.join(self.save_dir, f"{id_in}_{id_out}_record.npz")
+        attr_path = os.path.join(self.save_dir, f"{id_in}_{id_out}_attr.npz")
+        tensor_record = sp.load_npz(rec_path)
+        tensor_attr = sp.load_npz(attr_path)
+        return tensor_record, tensor_attr
 
 
 def trace(

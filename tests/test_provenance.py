@@ -1,30 +1,30 @@
 import numpy as np
 import pandas as pd
 
-# from provenance_coo import Provenance, trace
+from provenance_coo import Provenance, trace
 # from provenance_csr import Provenance, trace
-from provenance_pandas import Provenance, trace
+# from provenance_pandas import Provenance, trace
 
-
-user_df = pd.DataFrame({
-    "ID": [10, 20, 30, 40],
-    "Birthdate": ["1996-07-12", "1994-03-08", np.nan, "1987-11-23"],
-    "Gender": ["F", "M", "F", "M"],
-    "Postcode": ["90210", np.nan, "12345", "67890"]
-})
-
-post_df = pd.DataFrame({
-    "ID": [1, 2, 3, 4],
-    "UID": [10, 40, 30, 10],
-    "Topic": ["Art", "Football", "Travel", "Travel"]
-})
-
-prov = Provenance(verbose=1)
-user_wdf = prov.subscribe(user_df)
-post_wdf = prov.subscribe(post_df)
-
+save_dir = "results"
 
 def test_capture(capsys):
+    user_df = pd.DataFrame({
+        "ID": [10, 20, 30, 40],
+        "Birthdate": ["1996-07-12", "1994-03-08", np.nan, "1987-11-23"],
+        "Gender": ["F", "M", "F", "M"],
+        "Postcode": ["90210", np.nan, "12345", "67890"]
+    })
+
+    post_df = pd.DataFrame({
+        "ID": [1, 2, 3, 4],
+        "UID": [10, 40, 30, 10],
+        "Topic": ["Art", "Football", "Travel", "Travel"]
+    })
+
+    prov = Provenance(save_dir=save_dir, verbose=1)
+    user_wdf = prov.subscribe(user_df)
+    post_wdf = prov.subscribe(post_df)
+
     prov.pause()
     user_wdf_HA = user_wdf.copy()
     user_wdf_HA.loc[len(user_wdf_HA)] = [15, "2000-10-20", "F", "75014"]
@@ -236,8 +236,12 @@ def test_capture(capsys):
  [4 4]
  [5 5]]
 """
+    return prov
+
 
 def test_trace(capsys):
+    prov = Provenance(save_dir=save_dir, verbose=1)
+    prov.load()
     path = prov.graph.get_edges(1, 14)[0]
     tensor_records = [p[0] for p in path]
 
