@@ -4,7 +4,7 @@ from collections import defaultdict
 
 import pandas as pd
 
-from utils import get_merge_column_mapping
+from .utils import get_merge_column_mapping
 
 
 class WatchedDataFrame:

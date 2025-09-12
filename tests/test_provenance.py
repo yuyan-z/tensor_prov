@@ -1,9 +1,9 @@
 import numpy as np
 import pandas as pd
 
-from provenance_coo import Provenance, trace
-# from provenance_csr import Provenance, trace
-# from provenance_pandas import Provenance, trace
+# from tensor_prov.provenance_coo import Provenance, trace
+# from tensor_prov.provenance_csr import Provenance, trace
+from tensor_prov.provenance_pandas import Provenance, trace
 
 save_dir = "results"
 
@@ -236,7 +236,6 @@ def test_capture(capsys):
  [4 4]
  [5 5]]
 """
-    return prov
 
 
 def test_trace(capsys):

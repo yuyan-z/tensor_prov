@@ -1,11 +1,11 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "tensor-prov"
 version = "0.1.0"
-description = "Tensor provenance tracking tools"
+description = "Provenance tracking tool"
 authors = [
     { name="Yuyan", email="yuyan_zhao@outlook.com" }
 ]
@@ -23,5 +23,5 @@ Homepage = "https://github.com/yuyan-z/tensor_prov"
 Repository = "https://github.com/yuyan-z/tensor_prov"
 
 [tool.setuptools.packages.find]
-where = ["tensor_prov"]
+where = ["src"]
 include = ["tensor_prov*"]

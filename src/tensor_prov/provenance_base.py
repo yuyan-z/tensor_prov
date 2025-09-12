@@ -8,8 +8,8 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from prov_graph import ProvGraph
-from watched_pandas import WatchedDataFrame
+from .prov_graph import ProvGraph
+from .watched_pandas import WatchedDataFrame
 
 
 def capture_time(func):

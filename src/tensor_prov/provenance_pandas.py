@@ -1,9 +1,10 @@
 import os
+from typing import Any
 
 import numpy as np
 import pandas as pd
 
-from provenance_base import ProvenanceBase
+from .provenance_base import ProvenanceBase
 
 
 class Provenance(ProvenanceBase):
@@ -47,6 +48,19 @@ class Provenance(ProvenanceBase):
                               for col in tensor_record.columns})
         np.savez(attr_path, **{col: tensor_attr[col].to_numpy()
                                for col in tensor_attr.columns})
+
+    def load_prov_result(
+            self,
+            id_in: int,
+            id_out: int
+    ) -> tuple[pd.DataFrame, pd.DataFrame]:
+        rec_path = os.path.join(self.save_dir, f"{id_in}_{id_out}_record.npz")
+        attr_path = os.path.join(self.save_dir, f"{id_in}_{id_out}_attr.npz")
+        with np.load(rec_path, allow_pickle=True) as data:
+            tensor_record = pd.DataFrame({k: data[k] for k in data.files})
+        with np.load(attr_path, allow_pickle=True) as data:
+            tensor_attr = pd.DataFrame({k: data[k] for k in data.files})
+        return tensor_record, tensor_attr
 
 
 def trace(

@@ -5,8 +5,8 @@ import pandas as pd
 from scipy.sparse import coo_matrix
 import scipy.sparse as sp
 
-from provenance_base import ProvenanceBase
-from utils_type import csr2arr, coo2arr
+from .provenance_base import ProvenanceBase
+from .utils_type import csr2arr, coo2arr
 
 
 class Provenance(ProvenanceBase):
