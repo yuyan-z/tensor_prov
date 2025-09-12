@@ -64,19 +64,23 @@ class WatchedDataFrame:
                         self.id = self.prov.graph.new_id()
                 # return new object methods
                 else:
-                    if attr == "merge":
-                        result = _hook_merge(self, *args, **kwargs)
-                    else:
-                        result = orig_attr(*args, **kwargs)
-                        if isinstance(result, pd.DataFrame):
-                            result = WatchedDataFrame(result, self.prov)
-                            if WatchedDataFrame.is_tracking:
-                                self.prov.capture(self, result)
+                    result = orig_attr(*args, **kwargs)
+                    if isinstance(result, pd.DataFrame):
+                        result = WatchedDataFrame(result, self.prov)
+                        if WatchedDataFrame.is_tracking:
+                            self.prov.capture(self, result)
                 return result
 
             return hook
         else:
             return orig_attr
+
+    def merge(self, *args, **kwargs):
+        if kwargs.get("right", None):
+            right_wdf = kwargs.pop("right")
+        else:
+            right_wdf, *args = args
+        return _hook_merge(self, right_wdf, *args, **kwargs)
 
     @property
     def loc(self):
@@ -117,18 +121,17 @@ class _WatchedIndexer:
             self._wdf.id = self._wdf.prov.graph.new_id()
 
 
-def _hook_merge(left_wdf: WatchedDataFrame, *args, **kwargs):
+def _hook_merge(left_wdf: WatchedDataFrame, right_wdf: WatchedDataFrame, *args, **kwargs):
     left_df = left_wdf.df.copy()
-    left_df["primary_key_x"] = range(len(left_df))
-    if kwargs.get("right", None):
-        right_wdf = kwargs.pop("right")
-    else:
-        right_wdf, *args = args
     right_df = right_wdf.df.copy()
+    left_df["primary_key_x"] = range(len(left_df))
     right_df["primary_key_y"] = range(len(right_df))
     result = left_df.merge(right_df, *args, **kwargs)
-    column_mapping = get_merge_column_mapping(left_wdf.df.columns, right_wdf.df.columns,
-                                              result.columns)
+    column_mapping = get_merge_column_mapping(
+        left_wdf.df.columns,
+        right_wdf.df.columns,
+        result.columns
+    )
     new_id = left_wdf.prov.graph.new_id()
     left_wdf.prov.capture(
         [left_df, right_df],

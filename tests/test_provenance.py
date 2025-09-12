@@ -1,9 +1,9 @@
 import numpy as np
 import pandas as pd
 
-# from tensor_prov.provenance_coo import Provenance, trace
+from tensor_prov.provenance_coo import Provenance, trace
 # from tensor_prov.provenance_csr import Provenance, trace
-from tensor_prov.provenance_pandas import Provenance, trace
+# from tensor_prov.provenance_pandas import Provenance, trace
 
 save_dir = "results"
 
