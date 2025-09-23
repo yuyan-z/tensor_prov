@@ -42,7 +42,7 @@ class ProvGraph:
             edge_objs_list.append(edges_objs)
         return edge_objs_list
 
-    def visualize(self, figsize=(12, 6), seed=42):
+    def visualize(self, figsize, seed):
         pos = nx.spring_layout(self.G, seed=seed)
         labels = {}
         for n in self.G.nodes:

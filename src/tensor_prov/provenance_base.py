@@ -176,8 +176,8 @@ class ProvenanceBase(ABC):
     def get_history(self, start_id, end_id):
         return self.graph.get_edges(start_id, end_id)
 
-    def visualize(self):
-        self.graph.visualize()
+    def visualize(self, figsize=(12, 6), seed=42):
+        self.graph.visualize(figsize, seed)
 
 
     @abstractmethod
