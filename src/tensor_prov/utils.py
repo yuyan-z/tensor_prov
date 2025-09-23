@@ -7,3 +7,5 @@ def get_merge_column_mapping(cols_left, cols_right, cols_out, suffixes=("_x", "_
         if f"{col}{suffixes[1]}" in cols_out:
             column_mapping[1][col] = [f"{col}{suffixes[1]}"]
     return column_mapping
+
+

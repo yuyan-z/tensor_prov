@@ -18,7 +18,7 @@ def capture_time(func):
         start = time.time()
         result = func(self, *args, **kwargs)
         runtime = time.time() - start
-        self.last_runtime = runtime
+        self.runtimes.append(runtime)
         if self.verbose == 1:
             print(f"\n[{func.__name__}] Runtime: {runtime:.4f} s")
         return result
@@ -36,16 +36,18 @@ class ProvenanceBase(ABC):
         os.makedirs(self.save_dir, exist_ok=True)
         self.graph = ProvGraph()
         self.verbose = verbose
+        self.is_tracking = True
+        self.runtimes = []
 
     def subscribe(self, df) -> WatchedDataFrame:
         wdf = WatchedDataFrame(df, self)
         return wdf
 
     def pause(self):
-        WatchedDataFrame.is_tracking = False
+        self.is_tracking = False
 
     def start(self):
-        WatchedDataFrame.is_tracking = True
+        self.is_tracking = True
 
     @capture_time
     def capture(
@@ -178,7 +180,6 @@ class ProvenanceBase(ABC):
 
     def visualize(self, figsize=(12, 6), seed=42):
         self.graph.visualize(figsize, seed)
-
 
     @abstractmethod
     def create_sparse_tensor(

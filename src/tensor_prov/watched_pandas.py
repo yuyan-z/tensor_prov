@@ -6,8 +6,6 @@ from .utils import get_merge_column_mapping
 
 
 class WatchedDataFrame:
-    is_tracking = True
-
     def __init__(self, df, prov, i=None):
         self.df = df.copy()
         self.prov = prov
@@ -16,19 +14,19 @@ class WatchedDataFrame:
     def set(self, new: pd.DataFrame | WatchedDataFrame, **kwargs):
         if isinstance(new, pd.DataFrame):
             new_id = self.prov.graph.generate_id()
-            if WatchedDataFrame.is_tracking:
+            if self.prov.is_tracking:
                 self.prov.capture(self.df, new, id_in=self.id, id_out=new_id, **kwargs)
             self.df = new
             self.id = new_id
         elif isinstance(new, WatchedDataFrame):
-            if WatchedDataFrame.is_tracking:
+            if self.prov.is_tracking:
                 self.prov.capture(self, new, **kwargs)
             self.df = new.df
             self.id = new.id
 
     def __setitem__(self, key, value):
         # print("__setitem__")
-        if WatchedDataFrame.is_tracking:
+        if self.prov.is_tracking:
             wdf_old = WatchedDataFrame(self.df, self.prov, self.id)
             self.df[key] = value
             self.id = self.prov.graph.generate_id()
@@ -42,7 +40,7 @@ class WatchedDataFrame:
         result = self.df[key]
         if isinstance(result, pd.DataFrame):
             result = WatchedDataFrame(result, self.prov)
-            if WatchedDataFrame.is_tracking:
+            if self.prov.is_tracking:
                 self.prov.capture(self, result)
         return result
 
@@ -54,7 +52,7 @@ class WatchedDataFrame:
             def hook(*args, **kwargs):
                 # inplace methods
                 if kwargs.get('inplace', False):
-                    if WatchedDataFrame.is_tracking:
+                    if self.prov.is_tracking:
                         wdf_old = WatchedDataFrame(self.df, self.prov, self.id)
                         result = orig_attr(*args, **kwargs)
                         self.id = self.prov.graph.generate_id()
@@ -67,7 +65,7 @@ class WatchedDataFrame:
                     result = orig_attr(*args, **kwargs)
                     if isinstance(result, pd.DataFrame):
                         result = WatchedDataFrame(result, self.prov)
-                        if WatchedDataFrame.is_tracking:
+                        if self.prov.is_tracking:
                             self.prov.capture(self, result)
                 return result
 
@@ -105,13 +103,13 @@ class _WatchedIndexer:
         if isinstance(result, pd.DataFrame):
             prov = self._wdf.prov
             result = WatchedDataFrame(result, prov)
-            if WatchedDataFrame.is_tracking:
+            if self._wdf.prov.is_tracking:
                 prov.capture(self._wdf, result)
         return result
 
     def __setitem__(self, key, value):
         # print("_WatchedIndexer __setitem__")
-        if WatchedDataFrame.is_tracking:
+        if self._wdf.prov.is_tracking:
             wdf_old = WatchedDataFrame(self._wdf.df, self._wdf.prov, self._wdf.id)
             self._indexer[key] = value
             self._wdf.id = self._wdf.prov.graph.generate_id()
@@ -154,3 +152,49 @@ def merge(*args, **kwargs):
     else:
         left_wdf, right_wdf, *args = args
     return _hook_merge(left_wdf, right_wdf, *args, **kwargs)
+
+
+def get_dummies(*args, **kwargs):
+    if "data" in kwargs:
+        wdf = kwargs.pop("data")
+    else:
+        wdf, *args = args
+
+    result = pd.get_dummies(wdf.df, *args, **kwargs)
+
+    columns = kwargs.get("columns", None)
+    if columns is None:
+        columns = wdf.df.select_dtypes(include=["object", "category"]).columns.tolist()
+
+    prefix = kwargs.get("prefix", None)
+    if prefix is None:
+        prefix_dict = {col: col for col in columns}
+    elif isinstance(prefix, str):
+        prefix_dict = {col: prefix for col in columns}
+    elif isinstance(prefix, (list, tuple)):
+        prefix_dict = dict(zip(columns, prefix))
+    elif isinstance(prefix, dict):
+        prefix_dict = {col: prefix.get(col, col) for col in columns}
+    else:
+        raise TypeError("prefix type")
+
+    dummy_na = bool(kwargs.get("dummy_na", False))
+    prefix_sep = kwargs.get("prefix_sep", "_")
+
+    mapping = {}
+    result_cols = set(result.columns.tolist())
+    for col in columns:
+        values = wdf.df[col]
+        unique_vals = values.dropna().astype(str).unique().tolist()
+
+        if dummy_na and values.isna().any():
+            unique_vals.append("nan")
+
+        encoded_cols = [f"{prefix_dict[col]}{prefix_sep}{v}" for v in unique_vals]
+        mapping[col] = [c for c in encoded_cols if c in result_cols]
+
+    result = WatchedDataFrame(result, wdf.prov)
+    if wdf.prov.is_tracking:
+        wdf.prov.capture(wdf, result, column_mapping=mapping)
+
+    return result
