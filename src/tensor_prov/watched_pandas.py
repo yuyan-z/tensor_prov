@@ -11,11 +11,11 @@ class WatchedDataFrame:
     def __init__(self, df, prov, i=None):
         self.df = df.copy()
         self.prov = prov
-        self.id = prov.graph.new_id() if i is None else i
+        self.id = prov.graph.generate_id() if i is None else i
 
     def set(self, new: pd.DataFrame | WatchedDataFrame, **kwargs):
         if isinstance(new, pd.DataFrame):
-            new_id = self.prov.graph.new_id()
+            new_id = self.prov.graph.generate_id()
             if WatchedDataFrame.is_tracking:
                 self.prov.capture(self.df, new, id_in=self.id, id_out=new_id, **kwargs)
             self.df = new
@@ -31,11 +31,11 @@ class WatchedDataFrame:
         if WatchedDataFrame.is_tracking:
             wdf_old = WatchedDataFrame(self.df, self.prov, self.id)
             self.df[key] = value
-            self.id = self.prov.graph.new_id()
+            self.id = self.prov.graph.generate_id()
             self.prov.capture(wdf_old, self)
         else:
             self.df[key] = value
-            self.id = self.prov.graph.new_id()
+            self.id = self.prov.graph.generate_id()
 
     def __getitem__(self, key):
         # print("__getitem__")
@@ -57,11 +57,11 @@ class WatchedDataFrame:
                     if WatchedDataFrame.is_tracking:
                         wdf_old = WatchedDataFrame(self.df, self.prov, self.id)
                         result = orig_attr(*args, **kwargs)
-                        self.id = self.prov.graph.new_id()
+                        self.id = self.prov.graph.generate_id()
                         self.prov.capture(wdf_old, self)
                     else:
                         result = orig_attr(*args, **kwargs)
-                        self.id = self.prov.graph.new_id()
+                        self.id = self.prov.graph.generate_id()
                 # return new object methods
                 else:
                     result = orig_attr(*args, **kwargs)
@@ -114,11 +114,11 @@ class _WatchedIndexer:
         if WatchedDataFrame.is_tracking:
             wdf_old = WatchedDataFrame(self._wdf.df, self._wdf.prov, self._wdf.id)
             self._indexer[key] = value
-            self._wdf.id = self._wdf.prov.graph.new_id()
+            self._wdf.id = self._wdf.prov.graph.generate_id()
             self._wdf.prov.capture(wdf_old, self._wdf)
         else:
             self._indexer[key] = value
-            self._wdf.id = self._wdf.prov.graph.new_id()
+            self._wdf.id = self._wdf.prov.graph.generate_id()
 
 
 def _hook_merge(left_wdf: WatchedDataFrame, right_wdf: WatchedDataFrame, *args, **kwargs):
@@ -128,11 +128,11 @@ def _hook_merge(left_wdf: WatchedDataFrame, right_wdf: WatchedDataFrame, *args, 
     right_df["primary_key_y"] = range(len(right_df))
     result = left_df.merge(right_df, *args, **kwargs)
     column_mapping = get_merge_column_mapping(
-        left_wdf.df.columns,
-        right_wdf.df.columns,
+        left_wdf.columns,
+        right_wdf.columns,
         result.columns
     )
-    new_id = left_wdf.prov.graph.new_id()
+    new_id = left_wdf.prov.graph.generate_id()
     left_wdf.prov.capture(
         [left_df, right_df],
         result,
@@ -145,3 +145,12 @@ def _hook_merge(left_wdf: WatchedDataFrame, right_wdf: WatchedDataFrame, *args, 
     result = result.drop(columns=["primary_key_x", "primary_key_y"])
     result = WatchedDataFrame(result, left_wdf.prov, new_id)
     return result
+
+
+def merge(*args, **kwargs):
+    if "left" in kwargs and "right" in kwargs:
+        left_wdf = kwargs.pop("left")
+        right_wdf = kwargs.pop("right")
+    else:
+        left_wdf, right_wdf, *args = args
+    return _hook_merge(left_wdf, right_wdf, *args, **kwargs)

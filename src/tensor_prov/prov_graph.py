@@ -13,7 +13,7 @@ class ProvGraph:
         self.root = 'root'
         self.G.add_node(self.root)
 
-    def new_id(self):
+    def generate_id(self):
         return next(self._id_counter)
 
     def add_edge(self, src_id, dst_id, edge_obj=None):
@@ -63,7 +63,7 @@ class ProvGraph:
         }
         file_path = os.path.join(file_dir, "graph.json")
         with open(file_path, "w", encoding="utf-8") as f:
-            json.dump(graph_json, f, ensure_ascii=False, indent=2)
+            json.dump(graph_json, f, ensure_ascii=False, indent=2)  # type: ignore[arg-type]
         return graph_json
 
     def load_graph(self, file_dir: str, prov):

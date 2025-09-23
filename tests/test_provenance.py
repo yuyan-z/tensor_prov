@@ -1,18 +1,18 @@
-import numpy as np
 import pandas as pd
 
 from tensor_prov.provenance_coo import Provenance, trace
 # from tensor_prov.provenance_csr import Provenance, trace
 # from tensor_prov.provenance_pandas import Provenance, trace
+import tensor_prov.watched_pandas as wpd
 
 save_dir = "results"
 
 def test_capture(capsys):
     user_df = pd.DataFrame({
         "ID": [10, 20, 30, 40],
-        "Birthdate": ["1996-07-12", "1994-03-08", np.nan, "1987-11-23"],
+        "Birthdate": ["1996-07-12", "1994-03-08", None, "1987-11-23"],
         "Gender": ["F", "M", "F", "M"],
-        "Postcode": ["90210", np.nan, "12345", "67890"]
+        "Postcode": ["90210", None, "12345", "67890"]
     })
 
     post_df = pd.DataFrame({
@@ -21,7 +21,7 @@ def test_capture(capsys):
         "Topic": ["Art", "Football", "Travel", "Travel"]
     })
 
-    prov = Provenance(save_dir=save_dir, verbose=1)
+    prov = Provenance(save_dir=save_dir, verbose=2)
     user_wdf = prov.subscribe(user_df)
     post_wdf = prov.subscribe(post_df)
 
@@ -36,15 +36,15 @@ def test_capture(capsys):
 -- df_in: 1 --
     ID   Birthdate Gender Postcode
 0  10  1996-07-12      F    90210
-1  20  1994-03-08      M      NaN
-2  30         NaN      F    12345
+1  20  1994-03-08      M     None
+2  30        None      F    12345
 3  40  1987-11-23      M    67890
 -- df_out: 5 --
     ID   Birthdate Gender Postcode
 0  10  1996-07-12      F    90210
 4  15  2000-10-20      F    75014
-1  20  1994-03-08      M      NaN
-2  30         NaN      F    12345
+1  20  1994-03-08      M     None
+2  30        None      F    12345
 3  40  1987-11-23      M    67890
 -- tensor_record --
  [[0 0]
@@ -65,15 +65,15 @@ def test_capture(capsys):
     ID   Birthdate Gender Postcode
 0  10  1996-07-12      F    90210
 4  15  2000-10-20      F    75014
-1  20  1994-03-08      M      NaN
-2  30         NaN      F    12345
+1  20  1994-03-08      M     None
+2  30        None      F    12345
 3  40  1987-11-23      M    67890
 -- df_out: 6 --
     ID   Birthdate  Gender Postcode
 0  10  1996-07-12       0    90210
 4  15  2000-10-20       0    75014
-1  20  1994-03-08       1      NaN
-2  30         NaN       0    12345
+1  20  1994-03-08       1     None
+2  30        None       0    12345
 3  40  1987-11-23       1    67890
 -- tensor_record --
  [[0 0]
@@ -105,14 +105,14 @@ def test_capture(capsys):
     ID   Birthdate  Gender Postcode
 0  10  1996-07-12       0    90210
 4  15  2000-10-20       0    75014
-1  20  1994-03-08       1      NaN
-2  30         NaN       0    12345
+1  20  1994-03-08       1     None
+2  30        None       0    12345
 3  40  1987-11-23       1    67890
 -- df_out: 11 --
     ID  Birthdate  Gender Postcode    Year  Month   Day
 0  10 1996-07-12       0    90210  1996.0    7.0  12.0
 4  15 2000-10-20       0    75014  2000.0   10.0  20.0
-1  20 1994-03-08       1      NaN  1994.0    3.0   8.0
+1  20 1994-03-08       1     None  1994.0    3.0   8.0
 2  30        NaT       0    12345     NaN    NaN   NaN
 3  40 1987-11-23       1    67890  1987.0   11.0  23.0
 -- tensor_record --
@@ -138,7 +138,7 @@ def test_capture(capsys):
     ID  Birthdate  Gender Postcode    Year  Month   Day
 0  10 1996-07-12       0    90210  1996.0    7.0  12.0
 4  15 2000-10-20       0    75014  2000.0   10.0  20.0
-1  20 1994-03-08       1      NaN  1994.0    3.0   8.0
+1  20 1994-03-08       1     None  1994.0    3.0   8.0
 2  30        NaT       0    12345     NaN    NaN   NaN
 3  40 1987-11-23       1    67890  1987.0   11.0  23.0
 -- df_out: 12 --
@@ -160,7 +160,8 @@ def test_capture(capsys):
  [2 2]]
 """
 
-    join_wdf = user_wdf_VR.merge(post_wdf, left_on="ID", right_on="UID", how="inner")
+    # join_wdf = user_wdf_VR.merge(post_wdf, left_on="ID", right_on="UID", how="inner")
+    join_wdf = wpd.merge(user_wdf_VR, post_wdf, left_on="ID", right_on="UID", how="inner")
     assert capsys.readouterr().out == """-- id_in -> id_out--
  12 -> 13
 -- df_in: 12 --
@@ -241,8 +242,8 @@ def test_capture(capsys):
 def test_trace(capsys):
     prov = Provenance(save_dir=save_dir, verbose=1)
     prov.load()
-    path = prov.graph.get_edges(1, 14)[0]
-    tensor_records = [p[0] for p in path]
+    history = prov.get_history(1, 14)[0]
+    tensor_records = [h[0] for h in history]
 
     # backward trace
     trace_record = trace(tensor_records, "backward")

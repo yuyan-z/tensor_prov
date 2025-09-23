@@ -19,8 +19,8 @@ def capture_time(func):
         result = func(self, *args, **kwargs)
         runtime = time.time() - start
         self.last_runtime = runtime
-        # if self.verbose > 0:
-        #     print(f"\n[{func.__name__}] Runtime: {runtime:.4f} s")
+        if self.verbose == 1:
+            print(f"\n[{func.__name__}] Runtime: {runtime:.4f} s")
         return result
 
     return wrapper
@@ -28,6 +28,10 @@ def capture_time(func):
 
 class ProvenanceBase(ABC):
     def __init__(self, save_dir: str, verbose: int = 0):
+        """
+        :param save_dir:
+        :param verbose: 0: nothing, 1: runtime, 2: details
+        """
         self.save_dir = save_dir
         os.makedirs(self.save_dir, exist_ok=True)
         self.graph = ProvGraph()
@@ -100,7 +104,7 @@ class ProvenanceBase(ABC):
         result = (tensor_record, tensor_attr)
         self.graph.add_edge(id_in, id_out, (tensor_record, tensor_attr))
 
-        if self.verbose > 0:
+        if self.verbose == 2:
             if column_ignore:
                 self.print_prov_result(
                     df_in.drop(columns=column_ignore, errors="ignore"),
@@ -168,6 +172,13 @@ class ProvenanceBase(ABC):
 
     def load(self):
         self.graph.load_graph(self.save_dir, self)
+
+    def get_history(self, start_id, end_id):
+        return self.graph.get_edges(start_id, end_id)
+
+    def visualize(self):
+        self.graph.visualize()
+
 
     @abstractmethod
     def create_sparse_tensor(
