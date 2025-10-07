@@ -33,19 +33,6 @@ def test_capture(capsys):
     user_wdf.set(user_wdf_HA)
     assert capsys.readouterr().out == """-- id_in -> id_out--
  1 -> 5
--- df_in: 1 --
-    ID   Birthdate Gender Postcode
-0  10  1996-07-12      F    90210
-1  20  1994-03-08      M     None
-2  30        None      F    12345
-3  40  1987-11-23      M    67890
--- df_out: 5 --
-    ID   Birthdate Gender Postcode
-0  10  1996-07-12      F    90210
-4  15  2000-10-20      F    75014
-1  20  1994-03-08      M     None
-2  30        None      F    12345
-3  40  1987-11-23      M    67890
 -- tensor_record --
  [[0 0]
  [2 1]
@@ -61,20 +48,6 @@ def test_capture(capsys):
     user_wdf["Gender"] = user_wdf["Gender"].map({"F": 0, "M": 1})
     assert capsys.readouterr().out == """-- id_in -> id_out--
  5 -> 6
--- df_in: 5 --
-    ID   Birthdate Gender Postcode
-0  10  1996-07-12      F    90210
-4  15  2000-10-20      F    75014
-1  20  1994-03-08      M     None
-2  30        None      F    12345
-3  40  1987-11-23      M    67890
--- df_out: 6 --
-    ID   Birthdate  Gender Postcode
-0  10  1996-07-12       0    90210
-4  15  2000-10-20       0    75014
-1  20  1994-03-08       1     None
-2  30        None       0    12345
-3  40  1987-11-23       1    67890
 -- tensor_record --
  [[0 0]
  [1 1]
@@ -101,20 +74,6 @@ def test_capture(capsys):
     prov.capture(user_wdf, user_wdf_VA, column_mapping=column_mapping)
     assert capsys.readouterr().out == """-- id_in -> id_out--
  6 -> 11
--- df_in: 6 --
-    ID   Birthdate  Gender Postcode
-0  10  1996-07-12       0    90210
-4  15  2000-10-20       0    75014
-1  20  1994-03-08       1     None
-2  30        None       0    12345
-3  40  1987-11-23       1    67890
--- df_out: 11 --
-    ID  Birthdate  Gender Postcode    Year  Month   Day
-0  10 1996-07-12       0    90210  1996.0    7.0  12.0
-4  15 2000-10-20       0    75014  2000.0   10.0  20.0
-1  20 1994-03-08       1     None  1994.0    3.0   8.0
-2  30        NaT       0    12345     NaN    NaN   NaN
-3  40 1987-11-23       1    67890  1987.0   11.0  23.0
 -- tensor_record --
  [[0 0]
  [1 1]
@@ -134,20 +93,6 @@ def test_capture(capsys):
     user_wdf_VR = user_wdf_VA[["ID", "Year", "Gender"]]
     assert capsys.readouterr().out == """-- id_in -> id_out--
  11 -> 12
--- df_in: 11 --
-    ID  Birthdate  Gender Postcode    Year  Month   Day
-0  10 1996-07-12       0    90210  1996.0    7.0  12.0
-4  15 2000-10-20       0    75014  2000.0   10.0  20.0
-1  20 1994-03-08       1     None  1994.0    3.0   8.0
-2  30        NaT       0    12345     NaN    NaN   NaN
-3  40 1987-11-23       1    67890  1987.0   11.0  23.0
--- df_out: 12 --
-    ID    Year  Gender
-0  10  1996.0       0
-4  15  2000.0       0
-1  20  1994.0       1
-2  30     NaN       0
-3  40  1987.0       1
 -- tensor_record --
  [[0 0]
  [1 1]
@@ -164,19 +109,6 @@ def test_capture(capsys):
     join_wdf = wpd.merge(user_wdf_VR, post_wdf, left_on="ID", right_on="UID", how="inner")
     assert capsys.readouterr().out == """-- id_in -> id_out--
  12 -> 13
--- df_in: 12 --
-    ID    Year  Gender
-0  10  1996.0       0
-4  15  2000.0       0
-1  20  1994.0       1
-2  30     NaN       0
-3  40  1987.0       1
--- df_out: 13 --
-    ID_x    Year  Gender  ID_y  UID     Topic
-0    10  1996.0       0     1   10       Art
-1    10  1996.0       0     4   10    Travel
-2    30     NaN       0     3   30    Travel
-3    40  1987.0       1     2   40  Football
 -- tensor_record --
  [[0 0]
  [1 0]
@@ -188,18 +120,6 @@ def test_capture(capsys):
  [2 2]]
 -- id_in -> id_out--
  2 -> 13
--- df_in: 2 --
-    ID  UID     Topic
-0   1   10       Art
-1   2   40  Football
-2   3   30    Travel
-3   4   10    Travel
--- df_out: 13 --
-    ID_x    Year  Gender  ID_y  UID     Topic
-0    10  1996.0       0     1   10       Art
-1    10  1996.0       0     4   10    Travel
-2    30     NaN       0     3   30    Travel
-3    40  1987.0       1     2   40  Football
 -- tensor_record --
  [[0 0]
  [1 3]
@@ -214,17 +134,6 @@ def test_capture(capsys):
     join_wdf = join_wdf.dropna()
     assert capsys.readouterr().out == """-- id_in -> id_out--
  13 -> 14
--- df_in: 13 --
-    ID_x    Year  Gender  ID_y  UID     Topic
-0    10  1996.0       0     1   10       Art
-1    10  1996.0       0     4   10    Travel
-2    30     NaN       0     3   30    Travel
-3    40  1987.0       1     2   40  Football
--- df_out: 14 --
-    ID_x    Year  Gender  ID_y  UID     Topic
-0    10  1996.0       0     1   10       Art
-1    10  1996.0       0     4   10    Travel
-3    40  1987.0       1     2   40  Football
 -- tensor_record --
  [[0 0]
  [1 1]

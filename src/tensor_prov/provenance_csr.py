@@ -29,8 +29,6 @@ class Provenance(ProvenanceBase):
             result: tuple[csr_matrix, csr_matrix]
     ):
         print("-- id_in -> id_out--\n", id_in, '->', id_out)
-        print(f"-- df_in: {id_in} --\n", df_in)
-        print(f"-- df_out: {id_out} --\n", df_out)
         (tensor_record, tensor_attr) = result
         print("-- tensor_record --\n", csr2arr(tensor_record))
         # print(tensor_record.todense())

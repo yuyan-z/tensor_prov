@@ -28,8 +28,6 @@ class Provenance(ProvenanceBase):
             result: tuple[pd.DataFrame, pd.DataFrame]
     ):
         print("-- id_in -> id_out--\n", id_in, '->', id_out)
-        print(f"-- df_in: {id_in} --\n", df_in)
-        print(f"-- df_out: {id_out} --\n", df_out)
         (tensor_record, tensor_attr) = result
         print("-- tensor_record --\n", tensor_record.to_numpy())
         print("-- tensor_attr --\n", tensor_attr.to_numpy())
