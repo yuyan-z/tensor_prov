@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from .utils import get_merge_column_mapping
+from .utils import get_merge_column_mapping, get_column_mapping
 
 
 class WatchedDataFrame:
@@ -56,7 +56,8 @@ class WatchedDataFrame:
                         wdf_old = WatchedDataFrame(self.df, self.prov, self.id)
                         result = orig_attr(*args, **kwargs)
                         self.id = self.prov.graph.generate_id()
-                        self.prov.capture(wdf_old, self)
+                        column_mapping = get_column_mapping(attr, wdf_old.columns, result.columns, **kwargs)
+                        self.prov.capture(wdf_old, self, column_mapping=column_mapping)
                     else:
                         result = orig_attr(*args, **kwargs)
                         self.id = self.prov.graph.generate_id()
@@ -66,7 +67,8 @@ class WatchedDataFrame:
                     if isinstance(result, pd.DataFrame):
                         result = WatchedDataFrame(result, self.prov)
                         if self.prov.is_tracking:
-                            self.prov.capture(self, result)
+                            column_mapping = get_column_mapping(attr, self.columns, result.columns, **kwargs)
+                            self.prov.capture(self, result, column_mapping=column_mapping)
                 return result
 
             return hook
@@ -181,7 +183,7 @@ def get_dummies(*args, **kwargs):
     dummy_na = bool(kwargs.get("dummy_na", False))
     prefix_sep = kwargs.get("prefix_sep", "_")
 
-    mapping = {}
+    column_mapping = {}
     result_cols = set(result.columns.tolist())
     for col in columns:
         values = wdf.df[col]
@@ -191,10 +193,10 @@ def get_dummies(*args, **kwargs):
             unique_vals.append("nan")
 
         encoded_cols = [f"{prefix_dict[col]}{prefix_sep}{v}" for v in unique_vals]
-        mapping[col] = [c for c in encoded_cols if c in result_cols]
+        column_mapping[col] = [c for c in encoded_cols if c in result_cols]
 
     result = WatchedDataFrame(result, wdf.prov)
     if wdf.prov.is_tracking:
-        wdf.prov.capture(wdf, result, column_mapping=mapping)
+        wdf.prov.capture(wdf, result, column_mapping=column_mapping)
 
     return result
