@@ -1,6 +1,6 @@
-# TensoProv
+# TensorProv
 
-**TensoProv** is a Python framework designed to **capture and query the provenance of data preparation pipelines**.  
+**TensorProv** is a Python framework designed to **capture and query the provenance of data preparation pipelines**.  
 It enables users to trace how data transformations, such as filtering, merging, and projection, affect the resulting datasets — providing detailed provenance information that supports reproducibility, debugging, and performance analysis.
 
 This repository is organized into three main directories:
